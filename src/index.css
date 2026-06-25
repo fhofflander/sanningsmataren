@@ -1,3 +1,14 @@
+/* Self-hosted fonts (bundled - no runtime CDN, so the extension's CSP and
+   offline use are both satisfied). */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";
+@import "@fontsource/jetbrains-mono/700.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -15,7 +26,28 @@ body,
 body {
   margin: 0;
   background-color: theme("colors.surface.page");
-  color: #0f172a;
+  color: theme("colors.ink.DEFAULT");
   font-family: theme("fontFamily.sans");
   -webkit-font-smoothing: antialiased;
+}
+
+/* One consistent, visible focus indicator for keyboard users (WCAG 2.4.7).
+   Tailwind's preflight removes the UA outline, so restore it here globally. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid theme("colors.accent.DEFAULT");
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+/* Respect reduced-motion preferences for the pulsing/streaming affordances. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

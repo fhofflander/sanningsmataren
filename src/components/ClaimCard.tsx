@@ -1,5 +1,5 @@
 import type { Claim, Verdict } from "../lib/types";
-import { VERDICT_COLOR } from "../lib/verdict";
+import { VERDICT_COLOR, VERDICT_SYMBOL } from "../lib/verdict";
 import { TruthGauge } from "./TruthGauge";
 
 export type CardStatus = "pending" | "done" | "error";
@@ -14,47 +14,68 @@ export interface CardState {
 export function ClaimCard({ state }: { state: CardState }) {
   const { claim, status, verdict, error } = state;
 
+  // A verdict-colored left edge makes a column of cards scannable at a glance.
+  const edgeColor =
+    status === "done" && verdict
+      ? VERDICT_COLOR[verdict.omdome]
+      : status === "error"
+        ? "#dc2626"
+        : "#cbd5e1";
+
   return (
-    <article className="rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
+    <article
+      className="rounded-lg border border-line bg-surface p-5 shadow-sm"
+      style={{ borderLeftWidth: 4, borderLeftColor: edgeColor }}
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <span className="font-mono text-[10px] uppercase tracking-widest text-accent">
           {claim.typ}
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
           {claim.talare}
         </span>
       </div>
 
-      <blockquote className="border-l-2 border-slate-300 pl-3 text-[15px] leading-relaxed text-slate-800">
+      <blockquote className="border-l-2 border-line-strong pl-3 text-[15px] leading-relaxed text-ink">
         "{claim.pastaende}"
       </blockquote>
 
       <div className="mt-4">
         {status === "pending" && (
-          <div className="flex items-center gap-2 font-mono text-xs text-slate-500">
-            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-accent" />
+          <div
+            className="flex items-center gap-2 font-mono text-xs text-ink-muted"
+            role="status"
+          >
+            <span
+              className="inline-block h-2 w-2 animate-pulse rounded-full bg-accent"
+              aria-hidden
+            />
             Granskar mot källor...
           </div>
         )}
 
         {status === "error" && (
-          <p className="rounded-md bg-red-50 px-3 py-2 font-mono text-xs text-red-700">
-            Kunde inte granska: {error}
+          <p
+            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 font-mono text-xs text-red-700"
+            role="alert"
+          >
+            <span className="font-semibold">Fel:</span> kunde inte granska - {error}
           </p>
         )}
 
         {status === "done" && verdict && (
           <div className="space-y-4">
             <div
-              className="inline-block rounded-md px-3 py-1 font-mono text-sm font-semibold uppercase tracking-wide text-white"
+              className="inline-flex items-center gap-2 rounded-md px-3 py-1 font-mono text-sm font-semibold uppercase tracking-wide text-white"
               style={{ backgroundColor: VERDICT_COLOR[verdict.omdome] }}
             >
+              <span aria-hidden>{VERDICT_SYMBOL[verdict.omdome]}</span>
               {verdict.omdome}
             </div>
 
             <TruthGauge omdome={verdict.omdome} />
 
-            <p className="text-sm leading-relaxed text-slate-700">
+            <p className="text-sm leading-relaxed text-ink-muted">
               {verdict.motivering}
             </p>
 
@@ -69,7 +90,7 @@ export function ClaimCard({ state }: { state: CardState }) {
 
             {verdict.kallor.length > 0 && (
               <div>
-                <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-slate-400">
+                <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-ink-faint">
                   Källor
                 </p>
                 <ul className="space-y-1">
@@ -82,6 +103,7 @@ export function ClaimCard({ state }: { state: CardState }) {
                         className="font-mono text-xs text-accent underline decoration-dotted underline-offset-2 hover:text-accent-deep"
                       >
                         {k.titel}
+                        <span className="sr-only"> (öppnas i ny flik)</span>
                       </a>
                     </li>
                   ))}

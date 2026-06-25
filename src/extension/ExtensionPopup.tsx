@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { AppShell } from "../components/AppShell";
 import { ClaimCard, type CardState } from "../components/ClaimCard";
 import { ClaimInput } from "../components/ClaimInput";
+import { EmptyState } from "../components/EmptyState";
+import { KeyNotice } from "../components/KeyNotice";
 import { Settings } from "../components/Settings";
 import { StatusLine } from "../components/StatusLine";
 import { runPool } from "../lib/concurrency";
@@ -158,6 +161,20 @@ function sourceLabel(url: string): string {
   }
 }
 
+// Reading the active tab via chrome.scripting needs host access to that page.
+// We don't ship that broad permission at install (privacy); instead we request
+// it on demand from the button gesture. Calling request() when already granted
+// resolves true with no prompt. Must be the first await in the click handler so
+// the user gesture is still active.
+function ensureHostAccess(): Promise<boolean> {
+  if (typeof chrome === "undefined" || !chrome.permissions?.request) {
+    return Promise.resolve(true);
+  }
+  return chrome.permissions
+    .request({ origins: ["*://*/*"] })
+    .catch(() => false);
+}
+
 export function ExtensionPopup() {
   const [settings, setSettings] = useState<SettingsType>(
     DEFAULT_EXTENSION_SETTINGS,
@@ -167,6 +184,9 @@ export function ExtensionPopup() {
   const [cards, setCards] = useState<CardState[]>([]);
   const [busy, setBusy] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const hasKey = !!activeKey(settings);
 
   const doneCount = useMemo(
     () => cards.filter((c) => c.status !== "pending").length,
@@ -189,6 +209,7 @@ export function ExtensionPopup() {
       if (!alive) return;
 
       setSettings(storedSettings);
+      setSettingsOpen(!activeKey(storedSettings));
 
       const hadPendingSelection = await applyPendingSelection();
       if (!alive || hadPendingSelection) return;
@@ -245,9 +266,17 @@ export function ExtensionPopup() {
 
   const handleUseSelection = async () => {
     setGlobalError(null);
+    if (!(await ensureHostAccess())) {
+      setGlobalError(
+        "Behörighet att läsa sidan nekades. Du kan klistra in texten manuellt istället.",
+      );
+      return;
+    }
     const foundSelection = await readActiveTabSelection();
     if (!foundSelection) {
-      setGlobalError("Ingen markerad text hittades på den aktiva fliken.");
+      setGlobalError(
+        "Ingen markerad text hittades på den aktiva fliken. Markera texten och försök igen.",
+      );
       return;
     }
     setSelection(foundSelection);
@@ -262,6 +291,7 @@ export function ExtensionPopup() {
       setGlobalError(
         "Ingen API-nyckel angiven. Öppna Inställningar och klistra in din nyckel.",
       );
+      setSettingsOpen(true);
       return;
     }
 
@@ -309,6 +339,12 @@ export function ExtensionPopup() {
 
   const handleReviewPage = async () => {
     setGlobalError(null);
+    if (!(await ensureHostAccess())) {
+      setGlobalError(
+        "Behörighet att läsa sidan nekades. Du kan klistra in texten manuellt istället.",
+      );
+      return;
+    }
     const foundPage = await readActiveTabPageText();
     if (!foundPage) {
       setGlobalError("Kunde inte läsa texten från den aktiva fliken.");
@@ -321,67 +357,66 @@ export function ExtensionPopup() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-surface-page">
-      <div className="mx-auto flex min-h-screen max-w-xl flex-col px-4 py-5">
-        <header className="mb-5">
-          <h1 className="font-mono text-xl font-bold tracking-tight text-accent-deep">
-            Sanningsmätaren
-          </h1>
-          {selection?.url && (
-            <p className="mt-1 truncate text-xs text-slate-500" title={selection.url}>
-              {selection.source === "whole-page" ? "Hela sidan" : "Markerad text"} från{" "}
-              {sourceLabel(selection.url)}
-            </p>
-          )}
-        </header>
+    <AppShell
+      variant="extension"
+      subtitle={
+        selection?.url ? (
+          <p className="mt-1 truncate text-xs text-ink-faint" title={selection.url}>
+            {selection.source === "whole-page" ? "Hela sidan" : "Markerad text"} från{" "}
+            {sourceLabel(selection.url)}
+          </p>
+        ) : undefined
+      }
+    >
+      <Settings
+        settings={settings}
+        onSave={handleSave}
+        onClear={handleClear}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+      />
 
-        <div className="space-y-4">
-          <Settings
-            settings={settings}
-            onSave={handleSave}
-            onClear={handleClear}
-          />
+      {!hasKey && <KeyNotice onOpenSettings={() => setSettingsOpen(true)} />}
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleUseSelection}
-              disabled={busy}
-              className="rounded-md border border-slate-300 px-3 py-2 font-mono text-xs uppercase tracking-wide text-slate-600 hover:border-accent hover:text-accent disabled:opacity-40"
-            >
-              Hämta markerad text
-            </button>
-            <button
-              type="button"
-              onClick={handleReviewPage}
-              disabled={busy}
-              className="rounded-md bg-accent px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-white hover:bg-accent-deep disabled:opacity-40"
-            >
-              Granska hela sidan
-            </button>
-          </div>
-
-          <ClaimInput
-            onSubmit={handleSubmit}
-            busy={busy}
-            initialText={initialText}
-          />
-
-          {globalError && (
-            <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-              {globalError}
-            </p>
-          )}
-
-          <StatusLine done={doneCount} total={cards.length} />
-
-          <div className="space-y-4">
-            {cards.map((card, i) => (
-              <ClaimCard key={i} state={card} />
-            ))}
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleUseSelection}
+          disabled={busy}
+          className="min-h-9 rounded-md border border-line-strong px-3 py-2 font-mono text-xs uppercase tracking-wide text-ink-muted hover:border-accent hover:text-accent disabled:opacity-40"
+        >
+          Hämta markerad text
+        </button>
+        <button
+          type="button"
+          onClick={handleReviewPage}
+          disabled={busy}
+          className="min-h-9 rounded-md bg-accent px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-white hover:bg-accent-deep disabled:opacity-40"
+        >
+          Granska hela sidan
+        </button>
       </div>
-    </div>
+
+      <ClaimInput onSubmit={handleSubmit} busy={busy} initialText={initialText} />
+
+      {globalError && (
+        <p
+          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+        >
+          {globalError}
+        </p>
+      )}
+
+      <StatusLine done={doneCount} total={cards.length} />
+
+      {cards.length === 0 && !busy && !globalError && <EmptyState />}
+
+      <div className="space-y-4" aria-busy={busy}>
+        {cards.map((card, i) => (
+          <ClaimCard key={i} state={card} />
+        ))}
+      </div>
+    </AppShell>
   );
 }

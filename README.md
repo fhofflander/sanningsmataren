@@ -101,11 +101,14 @@ The extension opens in Chrome's right-hand side panel and has four entry points:
 - mark text on a page and use the right-click menu
   **Granska markerad text med Sanningsmätaren**
 
-The right-click menu opens the side panel with the selected text queued. The
-reading entry points (**Hämta markerad text** / **Granska hela sidan**) read the
-active tab on demand via `chrome.scripting`, granted per-use by the `activeTab`
-permission - so the extension does **not** request access to all your sites and
-runs no always-on content script. API keys are stored in `chrome.storage.local`;
+The extension ships with **no** all-sites access and runs no always-on content
+script. The right-click menu works under the `activeTab` permission (the click
+itself grants one-off access to that page). The in-panel reading buttons
+(**Hämta markerad text** / **Granska hela sidan**) inject into the active tab via
+`chrome.scripting`, which needs page access - so the first time you use them the
+extension asks for permission to read page content (declared as an **optional**
+host permission, requested on demand, not at install). Manual paste and the
+right-click menu never need it. API keys are stored in `chrome.storage.local`;
 temporary selected text is passed through `chrome.storage.session`.
 
 ### Optional: pre-fill a key in dev

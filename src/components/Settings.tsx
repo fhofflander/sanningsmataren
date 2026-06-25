@@ -6,12 +6,14 @@ interface Props {
   settings: SettingsType;
   onSave: (next: SettingsType) => void;
   onClear: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function Settings({ settings, onSave, onClear }: Props) {
-  const [open, setOpen] = useState(false);
+export function Settings({ settings, onSave, onClear, open, onOpenChange }: Props) {
   const [draft, setDraft] = useState<SettingsType>(settings);
   const [saved, setSaved] = useState(false);
+  const [showKey, setShowKey] = useState(false);
 
   useEffect(() => {
     setDraft(settings);
@@ -33,43 +35,55 @@ export function Settings({ settings, onSave, onClear }: Props) {
     setSaved(false);
   };
 
-  const keyField =
-    draft.provider === "anthropic" ? "anthropicKey" : "geminiKey";
-  const keyValue = draft[keyField];
-  const keyLink =
-    draft.provider === "anthropic"
-      ? "https://console.anthropic.com/"
-      : "https://aistudio.google.com/apikey";
+  const keyValue =
+    draft.provider === "anthropic" ? draft.anthropicKey : draft.geminiKey;
+  const isAnthropic = draft.provider === "anthropic";
+  const keyLink = isAnthropic
+    ? "https://console.anthropic.com/"
+    : "https://aistudio.google.com/apikey";
+  const keyHowto = isAnthropic
+    ? "Skapa en nyckel i Anthropic Console (öppnas i ny flik), kopiera och klistra in här."
+    : "Skapa en gratis nyckel hos Google AI Studio (öppnas i ny flik) - logga in, klicka Create API key, kopiera och klistra in här.";
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-surface shadow-sm">
+    <section
+      className="rounded-lg border border-line bg-surface shadow-sm"
+      aria-label="Inställningar och API-nyckel"
+    >
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => onOpenChange(!open)}
+        aria-expanded={open}
         className="flex w-full items-center justify-between px-5 py-3 text-left"
       >
-        <span className="font-mono text-xs uppercase tracking-widest text-slate-600">
+        <span className="font-mono text-xs uppercase tracking-widest text-ink-muted">
           Inställningar / API-nyckel
         </span>
-        <span className="font-mono text-xs text-slate-400">
-          {open ? "dölj" : "visa"}
+        <span
+          className="font-mono text-xs text-ink-faint transition-transform"
+          style={{ transform: open ? "rotate(90deg)" : "none" }}
+          aria-hidden
+        >
+          ▸
         </span>
       </button>
 
       {open && (
-        <div className="space-y-4 border-t border-slate-100 px-5 py-4">
-          <div>
-            <label className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-slate-500">
+        <div className="space-y-4 border-t border-line px-5 py-4">
+          <div role="radiogroup" aria-label="Leverantör">
+            <span className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-ink-faint">
               Leverantör
-            </label>
+            </span>
             <div className="flex gap-2">
               {(Object.keys(PROVIDER_LABELS) as ProviderId[]).map((id) => (
                 <button
                   key={id}
+                  role="radio"
+                  aria-checked={draft.provider === id}
                   onClick={() => update({ provider: id })}
-                  className={`rounded-md border px-3 py-1.5 font-mono text-xs ${
+                  className={`min-h-9 rounded-md border px-3 py-1.5 font-mono text-xs ${
                     draft.provider === id
                       ? "border-accent bg-accent-soft text-accent-deep"
-                      : "border-slate-200 text-slate-600 hover:border-slate-300"
+                      : "border-line text-ink-muted hover:border-line-strong"
                   }`}
                 >
                   {PROVIDER_LABELS[id]}
@@ -78,19 +92,21 @@ export function Settings({ settings, onSave, onClear }: Props) {
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-slate-500">
+          <div role="radiogroup" aria-label="Körläge">
+            <span className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-ink-faint">
               Körläge
-            </label>
+            </span>
             <div className="flex gap-2">
               {(Object.keys(COST_MODE_LABELS) as CostMode[]).map((id) => (
                 <button
                   key={id}
+                  role="radio"
+                  aria-checked={draft.costMode === id}
                   onClick={() => update({ costMode: id })}
-                  className={`rounded-md border px-3 py-1.5 font-mono text-xs ${
+                  className={`min-h-9 rounded-md border px-3 py-1.5 font-mono text-xs ${
                     draft.costMode === id
                       ? "border-accent bg-accent-soft text-accent-deep"
-                      : "border-slate-200 text-slate-600 hover:border-slate-300"
+                      : "border-line text-ink-muted hover:border-line-strong"
                   }`}
                 >
                   {COST_MODE_LABELS[id]}
@@ -100,38 +116,52 @@ export function Settings({ settings, onSave, onClear }: Props) {
           </div>
 
           <div>
-            <label className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-slate-500">
+            <label
+              htmlFor="sm-api-key"
+              className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-ink-faint"
+            >
               API-nyckel ({PROVIDER_LABELS[draft.provider]})
             </label>
-            <input
-              type="password"
-              value={keyValue}
-              onChange={(e) =>
-                update(
-                  draft.provider === "anthropic"
-                    ? { anthropicKey: e.target.value }
-                    : { geminiKey: e.target.value },
-                )
-              }
-              placeholder={draft.provider === "anthropic" ? "sk-ant-..." : "AIza... / AQ..."}
-              autoComplete="off"
-              spellCheck={false}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm focus:border-accent focus:outline-none"
-            />
-            <p className="mt-1 font-mono text-[10px] text-slate-400">
-              Hämta nyckel:{" "}
+            <div className="flex gap-2">
+              <input
+                id="sm-api-key"
+                type={showKey ? "text" : "password"}
+                value={keyValue}
+                onChange={(e) =>
+                  update(
+                    isAnthropic
+                      ? { anthropicKey: e.target.value }
+                      : { geminiKey: e.target.value },
+                  )
+                }
+                placeholder={isAnthropic ? "sk-ant-..." : "AIza... / AQ..."}
+                autoComplete="off"
+                spellCheck={false}
+                className="w-full rounded-md border border-line-strong px-3 py-2 font-mono text-sm focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((s) => !s)}
+                aria-pressed={showKey}
+                className="shrink-0 rounded-md border border-line px-3 font-mono text-xs uppercase tracking-wide text-ink-muted hover:border-line-strong"
+              >
+                {showKey ? "Dölj" : "Visa"}
+              </button>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-ink-muted">
+              {keyHowto}{" "}
               <a
                 href={keyLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-accent underline"
+                className="font-mono text-accent underline"
               >
-                {keyLink}
+                Öppna sidan
               </a>
             </p>
           </div>
 
-          <p className="rounded-md bg-surface-muted px-3 py-2 text-xs leading-relaxed text-slate-600">
+          <p className="rounded-md border-l-2 border-line-strong bg-surface-muted px-3 py-2 text-xs leading-relaxed text-ink-muted">
             Nyckeln sparas endast lokalt i din webbläsare (localStorage) och
             skickas bara direkt till {PROVIDER_LABELS[draft.provider]}. Den når
             aldrig någon annan server - appen har ingen backend.
@@ -146,12 +176,12 @@ export function Settings({ settings, onSave, onClear }: Props) {
             </button>
             <button
               onClick={handleClear}
-              className="rounded-md border border-slate-300 px-4 py-2 font-mono text-xs uppercase tracking-wide text-slate-600 hover:border-slate-400"
+              className="rounded-md border border-line-strong px-4 py-2 font-mono text-xs uppercase tracking-wide text-ink-muted hover:border-ink-faint"
             >
               Rensa nycklar
             </button>
             {saved && (
-              <span className="font-mono text-xs text-green-700">Sparat ✓</span>
+              <span className="font-mono text-xs text-brand-altctrl">Sparat ✓</span>
             )}
           </div>
         </div>
