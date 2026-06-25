@@ -35,9 +35,11 @@ export interface Verdict {
 }
 
 export type ProviderId = "gemini" | "anthropic";
+export type CostMode = "budget" | "standard";
 
 export interface Settings {
   provider: ProviderId;
+  costMode: CostMode;
   geminiKey: string;
   anthropicKey: string;
 }

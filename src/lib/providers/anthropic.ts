@@ -9,11 +9,17 @@ import {
   verifyUserMessage,
 } from "../prompts";
 import { KeyError, type Claim, type Verdict } from "../types";
+import { shouldEscalateVerdict } from "./escalation";
 import type { LLMProvider } from "./provider";
 
 const URL = "https://api.anthropic.com/v1/messages";
 const EXTRACT_MODEL = "claude-haiku-4-5-20251001";
 const VERIFY_MODEL = "claude-sonnet-4-6";
+const BUDGET_VERIFY_MODEL = EXTRACT_MODEL;
+
+interface ProviderOptions {
+  costMode: "budget" | "standard";
+}
 
 // Preferred web search tool version, with a fallback if the API rejects it.
 const WEB_SEARCH_VERSIONS = ["web_search_20260209", "web_search_20250305"];
@@ -103,7 +109,25 @@ async function callAnthropic(
   throw new Error(lastErr || "Anthropic-anropet misslyckades.");
 }
 
-export function createAnthropicProvider(apiKey: string): LLMProvider {
+export function createAnthropicProvider(
+  apiKey: string,
+  options: ProviderOptions,
+): LLMProvider {
+  async function verifyWithModel(
+    model: string,
+    pastaende: string,
+    talare: string,
+  ): Promise<Verdict> {
+    const out = await callAnthropic(
+      apiKey,
+      model,
+      VERIFY_SYSTEM_PROMPT,
+      verifyUserMessage(pastaende, talare),
+      true,
+    );
+    return parseVerdict(out);
+  }
+
   return {
     async extract(text: string): Promise<Claim[]> {
       const out = await callAnthropic(
@@ -116,14 +140,26 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
       return parseClaims(out);
     },
     async verify(pastaende: string, talare: string): Promise<Verdict> {
-      const out = await callAnthropic(
-        apiKey,
-        VERIFY_MODEL,
-        VERIFY_SYSTEM_PROMPT,
-        verifyUserMessage(pastaende, talare),
-        true,
-      );
-      return parseVerdict(out);
+      if (options.costMode !== "budget") {
+        return verifyWithModel(VERIFY_MODEL, pastaende, talare);
+      }
+
+      let budgetVerdict: Verdict;
+      try {
+        budgetVerdict = await verifyWithModel(
+          BUDGET_VERIFY_MODEL,
+          pastaende,
+          talare,
+        );
+      } catch (e) {
+        if (e instanceof KeyError) throw e;
+        return verifyWithModel(VERIFY_MODEL, pastaende, talare);
+      }
+
+      if (shouldEscalateVerdict(budgetVerdict)) {
+        return verifyWithModel(VERIFY_MODEL, pastaende, talare);
+      }
+      return budgetVerdict;
     },
   };
 }

@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { PROVIDER_LABELS } from "../lib/providers";
-import type { ProviderId, Settings as SettingsType } from "../lib/types";
+import { useEffect, useState } from "react";
+import { COST_MODE_LABELS, PROVIDER_LABELS } from "../lib/providers";
+import type { CostMode, ProviderId, Settings as SettingsType } from "../lib/types";
 
 interface Props {
   settings: SettingsType;
@@ -12,6 +12,10 @@ export function Settings({ settings, onSave, onClear }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<SettingsType>(settings);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setDraft(settings);
+  }, [settings]);
 
   const update = (patch: Partial<SettingsType>) => {
     setDraft((d) => ({ ...d, ...patch }));
@@ -69,6 +73,27 @@ export function Settings({ settings, onSave, onClear }: Props) {
                   }`}
                 >
                   {PROVIDER_LABELS[id]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-slate-500">
+              Körläge
+            </label>
+            <div className="flex gap-2">
+              {(Object.keys(COST_MODE_LABELS) as CostMode[]).map((id) => (
+                <button
+                  key={id}
+                  onClick={() => update({ costMode: id })}
+                  className={`rounded-md border px-3 py-1.5 font-mono text-xs ${
+                    draft.costMode === id
+                      ? "border-accent bg-accent-soft text-accent-deep"
+                      : "border-slate-200 text-slate-600 hover:border-slate-300"
+                  }`}
+                >
+                  {COST_MODE_LABELS[id]}
                 </button>
               ))}
             </div>
