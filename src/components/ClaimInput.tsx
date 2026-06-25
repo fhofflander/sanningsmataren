@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const EXAMPLES: { label: string; text: string }[] = [
   {
@@ -18,10 +18,15 @@ const EXAMPLES: { label: string; text: string }[] = [
 interface Props {
   onSubmit: (text: string) => void;
   busy: boolean;
+  initialText?: string;
 }
 
-export function ClaimInput({ onSubmit, busy }: Props) {
+export function ClaimInput({ onSubmit, busy, initialText = "" }: Props) {
   const [text, setText] = useState("");
+
+  useEffect(() => {
+    if (initialText) setText(initialText);
+  }, [initialText]);
 
   const submit = () => {
     if (text.trim().length > 0 && !busy) onSubmit(text.trim());

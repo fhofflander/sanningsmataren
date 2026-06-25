@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Sanningsmätaren",
+  "version": "0.1.0",
+  "description": "Faktagranska svensk politisk text direkt från Chrome med egen API-nyckel.",
+  "action": {
+    "default_title": "Sanningsmätaren"
+  },
+  "side_panel": {
+    "default_path": "extension/popup.html"
+  },
+  "background": {
+    "service_worker": "assets/background.js",
+    "type": "module"
+  },
+  "permissions": ["activeTab", "contextMenus", "scripting", "sidePanel", "storage"],
+  "host_permissions": [
+    "<all_urls>",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["assets/contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

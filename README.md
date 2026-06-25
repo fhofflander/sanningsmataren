@@ -46,6 +46,13 @@ fact-checkers (Källkritikbyrån, SVT Verifierar).
 ## Providers (BYOK)
 
 You choose a provider in the in-app settings and paste your own key for it.
+The settings panel also has two cost modes:
+
+- **Budgetläge** (default): uses the cheaper model first and automatically
+  escalates to the standard verifier if the first answer is inconclusive,
+  source-less, or otherwise uncertain.
+- **Standard**: uses the standard verifier directly, matching the original
+  behavior.
 
 ### Google Gemini (free tier, default)
 
@@ -71,6 +78,34 @@ npm run dev
 
 Then open the dev URL, paste your key into **Inställningar / API-nyckel**, and
 paste some text to check.
+
+## Run as a Chrome extension
+
+Build the unpacked extension:
+
+```bash
+npm run build:extension
+```
+
+Then open `chrome://extensions`, enable **Developer mode**, choose
+**Load unpacked**, and select `dist-extension/`.
+
+After rebuilding, click **Reload** on the extension card in
+`chrome://extensions`. This is especially important after permission changes.
+
+The extension opens in Chrome's right-hand side panel and has four entry points:
+
+- click the Sanningsmätaren toolbar icon and paste text manually
+- click **Granska hela sidan** in the side panel to review the active page
+- mark text on a page, then click **Hämta markerad text** in the side panel
+- mark text on a page and use the right-click menu
+  **Granska markerad text med Sanningsmätaren**
+
+When text is selected on a page, the content script also shows a small
+**Granska** button near the selection. Both the right-click menu and the
+selection button open the side panel. API keys are stored in
+`chrome.storage.local`; temporary selected text is passed through
+`chrome.storage.session`.
 
 ### Optional: pre-fill a key in dev
 
