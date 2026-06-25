@@ -161,6 +161,20 @@ function sourceLabel(url: string): string {
   }
 }
 
+// Reading the active tab via chrome.scripting needs host access to that page.
+// We don't ship that broad permission at install (privacy); instead we request
+// it on demand from the button gesture. Calling request() when already granted
+// resolves true with no prompt. Must be the first await in the click handler so
+// the user gesture is still active.
+function ensureHostAccess(): Promise<boolean> {
+  if (typeof chrome === "undefined" || !chrome.permissions?.request) {
+    return Promise.resolve(true);
+  }
+  return chrome.permissions
+    .request({ origins: ["*://*/*"] })
+    .catch(() => false);
+}
+
 export function ExtensionPopup() {
   const [settings, setSettings] = useState<SettingsType>(
     DEFAULT_EXTENSION_SETTINGS,
@@ -252,9 +266,17 @@ export function ExtensionPopup() {
 
   const handleUseSelection = async () => {
     setGlobalError(null);
+    if (!(await ensureHostAccess())) {
+      setGlobalError(
+        "Behörighet att läsa sidan nekades. Du kan klistra in texten manuellt istället.",
+      );
+      return;
+    }
     const foundSelection = await readActiveTabSelection();
     if (!foundSelection) {
-      setGlobalError("Ingen markerad text hittades på den aktiva fliken.");
+      setGlobalError(
+        "Ingen markerad text hittades på den aktiva fliken. Markera texten och försök igen.",
+      );
       return;
     }
     setSelection(foundSelection);
@@ -317,6 +339,12 @@ export function ExtensionPopup() {
 
   const handleReviewPage = async () => {
     setGlobalError(null);
+    if (!(await ensureHostAccess())) {
+      setGlobalError(
+        "Behörighet att läsa sidan nekades. Du kan klistra in texten manuellt istället.",
+      );
+      return;
+    }
     const foundPage = await readActiveTabPageText();
     if (!foundPage) {
       setGlobalError("Kunde inte läsa texten från den aktiva fliken.");
