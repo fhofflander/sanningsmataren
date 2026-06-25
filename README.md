@@ -144,8 +144,9 @@ keeps casual use free; Anthropic is billed per token by your own org.
   sources and judge for yourself.
 - Works best with the politician's **exact words** - paraphrasing reduces
   accuracy.
-- Live audio, transcription, and browser-extension capture are explicitly
-  **out of scope** for this app.
+- Live audio capture and transcription are explicitly **out of scope** for this
+  app. It works only on text you paste, select, or load from a page - the Chrome
+  extension reads page/selection text, it does not record or transcribe audio.
 
 ## Stack
 
