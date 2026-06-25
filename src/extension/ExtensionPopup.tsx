@@ -44,52 +44,6 @@ function queryActiveTab(): Promise<ActiveTab | null> {
   });
 }
 
-function readSelectionFromContentScript(
-  tab: ActiveTab,
-): Promise<SelectionResponse | null> {
-  return new Promise((resolve) => {
-    if (!tab.id || !chrome.tabs?.sendMessage) {
-      resolve(null);
-      return;
-    }
-
-    chrome.tabs.sendMessage(
-      tab.id,
-      { type: "SM_GET_SELECTION" },
-      (response?: SelectionResponse) => {
-        if (chrome.runtime?.lastError || !response?.text?.trim()) {
-          resolve(null);
-          return;
-        }
-        resolve(response);
-      },
-    );
-  });
-}
-
-function readPageTextFromContentScript(
-  tab: ActiveTab,
-): Promise<SelectionResponse | null> {
-  return new Promise((resolve) => {
-    if (!tab.id || !chrome.tabs?.sendMessage) {
-      resolve(null);
-      return;
-    }
-
-    chrome.tabs.sendMessage(
-      tab.id,
-      { type: "SM_GET_PAGE_TEXT" },
-      (response?: SelectionResponse) => {
-        if (chrome.runtime?.lastError || !response?.text?.trim()) {
-          resolve(null);
-          return;
-        }
-        resolve(response);
-      },
-    );
-  });
-}
-
 function readSelectionByInjection(
   tab: ActiveTab,
 ): Promise<SelectionResponse | null> {
@@ -163,9 +117,7 @@ async function readActiveTabSelection(): Promise<PendingSelection | null> {
   const tab = await queryActiveTab();
   if (!tab?.id) return null;
 
-  const response =
-    (await readSelectionFromContentScript(tab)) ??
-    (await readSelectionByInjection(tab));
+  const response = await readSelectionByInjection(tab);
 
   if (!response?.text?.trim()) return null;
 
@@ -182,9 +134,7 @@ async function readActiveTabPageText(): Promise<PendingSelection | null> {
   const tab = await queryActiveTab();
   if (!tab?.id) return null;
 
-  const response =
-    (await readPageTextFromContentScript(tab)) ??
-    (await readPageTextByInjection(tab));
+  const response = await readPageTextByInjection(tab);
 
   if (!response?.text?.trim() || response.text.trim().length < MIN_PAGE_TEXT_LENGTH) {
     return null;
