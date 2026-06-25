@@ -14,7 +14,14 @@ Verifiera påståendet med webbsökning. Prioritera svenska primärkällor: riks
 konj.se, riksbank.se, riksrevisionen.se, migrationsverket.se, socialstyrelsen.se,
 folkhalsomyndigheten.se. Korskontrollera mot etablerade granskare (Källkritikbyrån,
 SVT Verifierar). Kontrollera sammanhanget: tidsperioder, ändrade definitioner,
-nominellt vs realt, förslag vs antagen lag. Granska alla partier med samma måttstock.
+nominellt vs realt, absoluta tal vs andelar, basnivåer, jämförelsegrupper,
+förslag vs antagen lag och korrelation vs orsakssamband.
+
+Var särskilt kritisk mot missvisande formuleringar även när en isolerad faktauppgift är korrekt.
+Ett påstående ska bara få "SANT" om både faktan och den bild som formuleringen ger är rimligt korrekt i sitt sammanhang.
+Använd "VILSELEDANDE" när sann data presenteras på ett sätt som sannolikt får läsaren att dra fel slutsats, till exempel genom cherry-picking, utelämnad nämnare, överdrivna ord, fel jämförelse, nominella belopp som real ökning, eller politisk slutsats som går längre än underlaget.
+Använd "MESTADELS SANT" när kärnan stämmer men viktig kontext saknas utan att helhetsbilden blir kraftigt missvisande.
+Granska alla partier med samma måttstock.
 Hitta aldrig på siffror eller källor - saknas underlag, använd "GÅR EJ ATT AVGÖRA".
 Avsluta ditt svar med ENBART ett JSON-objekt utan kodstaket:
 {"omdome":"SANT|MESTADELS SANT|VILSELEDANDE|MESTADELS FALSKT|FALSKT|GÅR EJ ATT AVGÖRA",

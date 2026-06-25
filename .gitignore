@@ -4,6 +4,8 @@ node_modules
 # Build output
 dist
 dist-ssr
+dist-extension
+*.tsbuildinfo
 
 # Local env files - NEVER commit real API keys.
 # Vite loads .env*.local; *.development.local is dev-only and is never
