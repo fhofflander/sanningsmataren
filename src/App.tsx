@@ -9,8 +9,8 @@ import { StatusLine } from "./components/StatusLine";
 import { runPool } from "./lib/concurrency";
 import { createProvider } from "./lib/providers";
 import {
-  activeKey,
   loadSettings,
+  missingRequiredKeyMessage,
   saveSettings,
   clearKeys,
 } from "./lib/storage";
@@ -20,7 +20,9 @@ const CONCURRENCY = 3;
 
 export default function App() {
   const [settings, setSettings] = useState<SettingsType>(() => loadSettings());
-  const [settingsOpen, setSettingsOpen] = useState(() => !activeKey(loadSettings()));
+  const [settingsOpen, setSettingsOpen] = useState(
+    () => !!missingRequiredKeyMessage(loadSettings()),
+  );
   const [cards, setCards] = useState<CardState[]>([]);
   const [busy, setBusy] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
@@ -29,7 +31,8 @@ export default function App() {
     () => cards.filter((c) => c.status !== "pending").length,
     [cards],
   );
-  const hasKey = !!activeKey(settings);
+  const missingKeyMessage = missingRequiredKeyMessage(settings);
+  const hasKey = !missingKeyMessage;
 
   const handleSave = (next: SettingsType) => {
     setSettings(next);
@@ -38,7 +41,12 @@ export default function App() {
 
   const handleClear = () => {
     clearKeys();
-    setSettings((s) => ({ ...s, geminiKey: "", anthropicKey: "" }));
+    setSettings((s) => ({
+      ...s,
+      geminiKey: "",
+      anthropicKey: "",
+      braveSearchKey: "",
+    }));
   };
 
   const updateCard = (index: number, patch: Partial<CardState>) => {
@@ -51,10 +59,9 @@ export default function App() {
     setGlobalError(null);
     setCards([]);
 
-    if (!activeKey(settings)) {
-      setGlobalError(
-        "Ingen API-nyckel angiven. Öppna Inställningar och klistra in din nyckel.",
-      );
+    const keyError = missingRequiredKeyMessage(settings);
+    if (keyError) {
+      setGlobalError(keyError);
       setSettingsOpen(true);
       return;
     }

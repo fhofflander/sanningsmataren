@@ -9,12 +9,16 @@ const PROVIDER_KEY = "sm_provider";
 const COST_MODE_KEY = "sm_cost_mode";
 const GEMINI_KEY = "sm_key_gemini";
 const ANTHROPIC_KEY = "sm_key_anthropic";
+const BRAVE_SEARCH_KEY = "sm_key_brave_search";
 
 // Dev-only fallbacks. Guarded by import.meta.env.DEV so production never reads
 // (or bundles) these values.
 const devGemini = import.meta.env.DEV ? import.meta.env.VITE_GEMINI_API_KEY ?? "" : "";
 const devAnthropic = import.meta.env.DEV
   ? import.meta.env.VITE_ANTHROPIC_API_KEY ?? ""
+  : "";
+const devBraveSearch = import.meta.env.DEV
+  ? import.meta.env.VITE_BRAVE_SEARCH_API_KEY ?? ""
   : "";
 
 function read(key: string): string | null {
@@ -41,6 +45,7 @@ export function loadSettings(): Settings {
     costMode: costMode === "standard" ? "standard" : "budget",
     geminiKey: read(GEMINI_KEY) ?? devGemini,
     anthropicKey: read(ANTHROPIC_KEY) ?? devAnthropic,
+    braveSearchKey: read(BRAVE_SEARCH_KEY) ?? devBraveSearch,
   };
 }
 
@@ -49,12 +54,14 @@ export function saveSettings(settings: Settings): void {
   write(COST_MODE_KEY, settings.costMode);
   write(GEMINI_KEY, settings.geminiKey.trim());
   write(ANTHROPIC_KEY, settings.anthropicKey.trim());
+  write(BRAVE_SEARCH_KEY, settings.braveSearchKey.trim());
 }
 
 export function clearKeys(): void {
   try {
     localStorage.removeItem(GEMINI_KEY);
     localStorage.removeItem(ANTHROPIC_KEY);
+    localStorage.removeItem(BRAVE_SEARCH_KEY);
   } catch {
     /* ignore */
   }
@@ -64,4 +71,16 @@ export function activeKey(settings: Settings): string {
   return settings.provider === "anthropic"
     ? settings.anthropicKey.trim()
     : settings.geminiKey.trim();
+}
+
+export function missingRequiredKeyMessage(settings: Settings): string | null {
+  if (!activeKey(settings)) {
+    return "Ingen AI-API-nyckel angiven. Öppna Inställningar och klistra in din nyckel.";
+  }
+
+  if (settings.costMode === "budget" && !settings.braveSearchKey.trim()) {
+    return "Budgetläget kräver en Brave Search API-nyckel. Öppna Inställningar och klistra in den, eller byt till Standard.";
+  }
+
+  return null;
 }

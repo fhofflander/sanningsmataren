@@ -8,7 +8,7 @@ import { Settings } from "../components/Settings";
 import { StatusLine } from "../components/StatusLine";
 import { runPool } from "../lib/concurrency";
 import { createProvider } from "../lib/providers";
-import { activeKey } from "../lib/storage";
+import { missingRequiredKeyMessage } from "../lib/storage";
 import {
   clearExtensionKeys,
   consumePendingSelection,
@@ -95,14 +95,39 @@ function readPageTextByInjection(
     chrome.scripting.executeScript(
       {
         target: { tabId: tab.id },
-        func: () => ({
-          text: (document.body?.innerText ?? "")
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 50000),
-          title: document.title,
-          url: location.href,
-        }),
+        func: () => {
+          const normalize = (text: string) =>
+            text
+              .replace(/\u00a0/g, " ")
+              .replace(/[ \t]+/g, " ")
+              .replace(/\n[ \t]+/g, "\n")
+              .replace(/\n{3,}/g, "\n\n")
+              .trim();
+
+          const candidates = Array.from(
+            document.querySelectorAll(
+              "article, main, [role='main'], [itemprop='articleBody']",
+            ),
+          )
+            .map((el) => normalize((el as HTMLElement).innerText ?? ""))
+            .filter((text) => text.length >= 200);
+
+          const score = (text: string) => {
+            const sentenceLike = (text.match(/[.!?]\s+[A-ZÅÄÖ]/g) ?? []).length;
+            const quoteLike = (text.match(/[”"]/g) ?? []).length;
+            return text.length + sentenceLike * 80 + quoteLike * 30;
+          };
+
+          const bestCandidate = candidates.sort((a, b) => score(b) - score(a))[0];
+          const bodyText = normalize(document.body?.innerText ?? "");
+          const text = bestCandidate || bodyText;
+
+          return {
+            text: text.slice(0, 50000),
+            title: document.title,
+            url: location.href,
+          };
+        },
       },
       (results?: Array<{ result?: SelectionResponse }>) => {
         if (chrome.runtime?.lastError) {
@@ -180,13 +205,15 @@ export function ExtensionPopup() {
     DEFAULT_EXTENSION_SETTINGS,
   );
   const [initialText, setInitialText] = useState("");
+  const [initialTextVersion, setInitialTextVersion] = useState(0);
   const [selection, setSelection] = useState<PendingSelection | null>(null);
   const [cards, setCards] = useState<CardState[]>([]);
   const [busy, setBusy] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const hasKey = !!activeKey(settings);
+  const missingKeyMessage = missingRequiredKeyMessage(settings);
+  const hasKey = !missingKeyMessage;
 
   const doneCount = useMemo(
     () => cards.filter((c) => c.status !== "pending").length,
@@ -198,6 +225,7 @@ export function ExtensionPopup() {
     if (!pendingSelection) return false;
     setSelection(pendingSelection);
     setInitialText(pendingSelection.text);
+    setInitialTextVersion((version) => version + 1);
     return true;
   };
 
@@ -209,7 +237,7 @@ export function ExtensionPopup() {
       if (!alive) return;
 
       setSettings(storedSettings);
-      setSettingsOpen(!activeKey(storedSettings));
+      setSettingsOpen(!!missingRequiredKeyMessage(storedSettings));
 
       const hadPendingSelection = await applyPendingSelection();
       if (!alive || hadPendingSelection) return;
@@ -219,6 +247,7 @@ export function ExtensionPopup() {
 
       setSelection(foundSelection);
       setInitialText(foundSelection.text);
+      setInitialTextVersion((version) => version + 1);
     })();
 
     return () => {
@@ -255,7 +284,12 @@ export function ExtensionPopup() {
 
   const handleClear = () => {
     void clearExtensionKeys();
-    setSettings((s) => ({ ...s, geminiKey: "", anthropicKey: "" }));
+    setSettings((s) => ({
+      ...s,
+      geminiKey: "",
+      anthropicKey: "",
+      braveSearchKey: "",
+    }));
   };
 
   const updateCard = (index: number, patch: Partial<CardState>) => {
@@ -281,16 +315,16 @@ export function ExtensionPopup() {
     }
     setSelection(foundSelection);
     setInitialText(foundSelection.text);
+    setInitialTextVersion((version) => version + 1);
   };
 
   const handleSubmit = async (text: string) => {
     setGlobalError(null);
     setCards([]);
 
-    if (!activeKey(settings)) {
-      setGlobalError(
-        "Ingen API-nyckel angiven. Öppna Inställningar och klistra in din nyckel.",
-      );
+    const keyError = missingRequiredKeyMessage(settings);
+    if (keyError) {
+      setGlobalError(keyError);
       setSettingsOpen(true);
       return;
     }
@@ -353,6 +387,7 @@ export function ExtensionPopup() {
 
     setSelection(foundPage);
     setInitialText(foundPage.text);
+    setInitialTextVersion((version) => version + 1);
     await handleSubmit(foundPage.text);
   };
 
@@ -397,7 +432,12 @@ export function ExtensionPopup() {
         </button>
       </div>
 
-      <ClaimInput onSubmit={handleSubmit} busy={busy} initialText={initialText} />
+      <ClaimInput
+        onSubmit={handleSubmit}
+        busy={busy}
+        initialText={initialText}
+        initialTextVersion={initialTextVersion}
+      />
 
       {globalError && (
         <p

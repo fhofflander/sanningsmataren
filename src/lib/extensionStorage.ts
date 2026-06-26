@@ -4,6 +4,7 @@ const PROVIDER_KEY = "sm_provider";
 const COST_MODE_KEY = "sm_cost_mode";
 const GEMINI_KEY = "sm_key_gemini";
 const ANTHROPIC_KEY = "sm_key_anthropic";
+const BRAVE_SEARCH_KEY = "sm_key_brave_search";
 const PENDING_SELECTION_KEY = "sm_pending_selection";
 const MAX_PENDING_AGE_MS = 10 * 60 * 1000;
 
@@ -20,6 +21,7 @@ export const DEFAULT_EXTENSION_SETTINGS: Settings = {
   costMode: "budget",
   geminiKey: "",
   anthropicKey: "",
+  braveSearchKey: "",
 };
 
 function hasChromeStorage(): boolean {
@@ -103,20 +105,24 @@ export async function loadExtensionSettings(): Promise<Settings> {
       costMode: costMode === "standard" ? "standard" : "budget",
       geminiKey: readLocal(GEMINI_KEY),
       anthropicKey: readLocal(ANTHROPIC_KEY),
+      braveSearchKey: readLocal(BRAVE_SEARCH_KEY),
     };
   }
 
-  const [providerRaw, costModeRaw, geminiKey, anthropicKey] = await Promise.all([
-    storageGet<ProviderId>("local", PROVIDER_KEY),
-    storageGet<Settings["costMode"]>("local", COST_MODE_KEY),
-    storageGet<string>("local", GEMINI_KEY),
-    storageGet<string>("local", ANTHROPIC_KEY),
-  ]);
+  const [providerRaw, costModeRaw, geminiKey, anthropicKey, braveSearchKey] =
+    await Promise.all([
+      storageGet<ProviderId>("local", PROVIDER_KEY),
+      storageGet<Settings["costMode"]>("local", COST_MODE_KEY),
+      storageGet<string>("local", GEMINI_KEY),
+      storageGet<string>("local", ANTHROPIC_KEY),
+      storageGet<string>("local", BRAVE_SEARCH_KEY),
+    ]);
   return {
     provider: providerRaw === "anthropic" ? "anthropic" : "gemini",
     costMode: costModeRaw === "standard" ? "standard" : "budget",
     geminiKey: geminiKey ?? "",
     anthropicKey: anthropicKey ?? "",
+    braveSearchKey: braveSearchKey ?? "",
   };
 }
 
@@ -126,6 +132,7 @@ export async function saveExtensionSettings(settings: Settings): Promise<void> {
     [COST_MODE_KEY]: settings.costMode,
     [GEMINI_KEY]: settings.geminiKey.trim(),
     [ANTHROPIC_KEY]: settings.anthropicKey.trim(),
+    [BRAVE_SEARCH_KEY]: settings.braveSearchKey.trim(),
   };
 
   if (!hasChromeStorage()) {
@@ -133,6 +140,7 @@ export async function saveExtensionSettings(settings: Settings): Promise<void> {
     writeLocal(COST_MODE_KEY, next[COST_MODE_KEY]);
     writeLocal(GEMINI_KEY, next[GEMINI_KEY]);
     writeLocal(ANTHROPIC_KEY, next[ANTHROPIC_KEY]);
+    writeLocal(BRAVE_SEARCH_KEY, next[BRAVE_SEARCH_KEY]);
     return;
   }
   await storageSet("local", next);
@@ -142,11 +150,13 @@ export async function clearExtensionKeys(): Promise<void> {
   if (!hasChromeStorage()) {
     removeLocal(GEMINI_KEY);
     removeLocal(ANTHROPIC_KEY);
+    removeLocal(BRAVE_SEARCH_KEY);
     return;
   }
   await Promise.all([
     storageRemove("local", GEMINI_KEY),
     storageRemove("local", ANTHROPIC_KEY),
+    storageRemove("local", BRAVE_SEARCH_KEY),
   ]);
 }
 

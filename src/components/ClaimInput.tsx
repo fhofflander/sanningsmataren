@@ -19,14 +19,20 @@ interface Props {
   onSubmit: (text: string) => void;
   busy: boolean;
   initialText?: string;
+  initialTextVersion?: number;
 }
 
-export function ClaimInput({ onSubmit, busy, initialText = "" }: Props) {
+export function ClaimInput({
+  onSubmit,
+  busy,
+  initialText = "",
+  initialTextVersion = 0,
+}: Props) {
   const [text, setText] = useState("");
 
   useEffect(() => {
     if (initialText) setText(initialText);
-  }, [initialText]);
+  }, [initialText, initialTextVersion]);
 
   const submit = () => {
     if (text.trim().length > 0 && !busy) onSubmit(text.trim());

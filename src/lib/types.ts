@@ -42,6 +42,7 @@ export interface Settings {
   costMode: CostMode;
   geminiKey: string;
   anthropicKey: string;
+  braveSearchKey: string;
 }
 
 // Thrown when a call fails because the key is missing or rejected (401/403),

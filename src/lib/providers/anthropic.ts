@@ -6,8 +6,11 @@ import { parseClaims, parseVerdict } from "../json";
 import {
   EXTRACT_SYSTEM_PROMPT,
   VERIFY_SYSTEM_PROMPT,
+  VERIFY_WITH_CONTEXT_SYSTEM_PROMPT,
   verifyUserMessage,
+  verifyUserMessageWithSources,
 } from "../prompts";
+import { formatSearchResults, type SearchProvider } from "../search/brave";
 import { KeyError, type Claim, type Verdict } from "../types";
 import { shouldEscalateVerdict } from "./escalation";
 import type { LLMProvider } from "./provider";
@@ -16,9 +19,15 @@ const URL = "https://api.anthropic.com/v1/messages";
 const EXTRACT_MODEL = "claude-haiku-4-5-20251001";
 const VERIFY_MODEL = "claude-sonnet-4-6";
 const BUDGET_VERIFY_MODEL = EXTRACT_MODEL;
+const EMPTY_EXTRACT_RETRY_MIN_CHARS = 280;
 
 interface ProviderOptions {
   costMode: "budget" | "standard";
+  searchProvider?: SearchProvider;
+}
+
+function shouldRetryEmptyExtraction(text: string): boolean {
+  return text.trim().length >= EMPTY_EXTRACT_RETRY_MIN_CHARS;
 }
 
 // Preferred web search tool version, with a fallback if the API rejects it.
@@ -113,35 +122,54 @@ export function createAnthropicProvider(
   apiKey: string,
   options: ProviderOptions,
 ): LLMProvider {
+  async function extractWithModel(model: string, text: string): Promise<Claim[]> {
+    const out = await callAnthropic(
+      apiKey,
+      model,
+      EXTRACT_SYSTEM_PROMPT,
+      text,
+      false,
+    );
+    return parseClaims(out);
+  }
+
   async function verifyWithModel(
     model: string,
     pastaende: string,
     talare: string,
+    useExternalSearch: boolean,
   ): Promise<Verdict> {
+    const searchResults = useExternalSearch
+      ? await options.searchProvider?.searchClaim(pastaende, talare)
+      : undefined;
+    const hasSearchResults = Array.isArray(searchResults);
     const out = await callAnthropic(
       apiKey,
       model,
-      VERIFY_SYSTEM_PROMPT,
-      verifyUserMessage(pastaende, talare),
-      true,
+      hasSearchResults ? VERIFY_WITH_CONTEXT_SYSTEM_PROMPT : VERIFY_SYSTEM_PROMPT,
+      hasSearchResults
+        ? verifyUserMessageWithSources(
+            pastaende,
+            talare,
+            formatSearchResults(searchResults),
+          )
+        : verifyUserMessage(pastaende, talare),
+      !hasSearchResults,
     );
     return parseVerdict(out);
   }
 
   return {
     async extract(text: string): Promise<Claim[]> {
-      const out = await callAnthropic(
-        apiKey,
-        EXTRACT_MODEL,
-        EXTRACT_SYSTEM_PROMPT,
-        text,
-        false,
-      );
-      return parseClaims(out);
+      const claims = await extractWithModel(EXTRACT_MODEL, text);
+      if (claims.length > 0 || !shouldRetryEmptyExtraction(text)) {
+        return claims;
+      }
+      return extractWithModel(VERIFY_MODEL, text);
     },
     async verify(pastaende: string, talare: string): Promise<Verdict> {
       if (options.costMode !== "budget") {
-        return verifyWithModel(VERIFY_MODEL, pastaende, talare);
+        return verifyWithModel(VERIFY_MODEL, pastaende, talare, false);
       }
 
       let budgetVerdict: Verdict;
@@ -150,14 +178,15 @@ export function createAnthropicProvider(
           BUDGET_VERIFY_MODEL,
           pastaende,
           talare,
+          true,
         );
       } catch (e) {
         if (e instanceof KeyError) throw e;
-        return verifyWithModel(VERIFY_MODEL, pastaende, talare);
+        return verifyWithModel(VERIFY_MODEL, pastaende, talare, true);
       }
 
       if (shouldEscalateVerdict(budgetVerdict)) {
-        return verifyWithModel(VERIFY_MODEL, pastaende, talare);
+        return verifyWithModel(VERIFY_MODEL, pastaende, talare, true);
       }
       return budgetVerdict;
     },
