@@ -26,6 +26,7 @@ export default function App() {
   const [cards, setCards] = useState<CardState[]>([]);
   const [busy, setBusy] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
 
   const doneCount = useMemo(
     () => cards.filter((c) => c.status !== "pending").length,
@@ -57,6 +58,7 @@ export default function App() {
 
   const handleSubmit = async (text: string) => {
     setGlobalError(null);
+    setProgressMessage(null);
     setCards([]);
 
     const keyError = missingRequiredKeyMessage(settings);
@@ -68,6 +70,7 @@ export default function App() {
 
     const provider = createProvider(settings);
     setBusy(true);
+    setProgressMessage("Läser texten och letar efter kontrollerbara påståenden...");
 
     let claims;
     try {
@@ -78,6 +81,7 @@ export default function App() {
           ? e.message
           : `Kunde inte extrahera påståenden: ${(e as Error).message}`,
       );
+      setProgressMessage(null);
       setBusy(false);
       return;
     }
@@ -86,14 +90,21 @@ export default function App() {
       setGlobalError(
         "Hittade inga kontrollerbara faktapåståenden i texten. Prova ett mer konkret citat.",
       );
+      setProgressMessage(null);
       setBusy(false);
       return;
     }
 
     setCards(claims.map((claim) => ({ claim, status: "pending" as const })));
+    setProgressMessage(
+      `Hittade ${claims.length} påståenden. Förbereder källgranskning...`,
+    );
 
-    await verifyClaims(provider, claims, CONCURRENCY, updateCard);
+    await verifyClaims(provider, claims, CONCURRENCY, updateCard, (progress) => {
+      setProgressMessage(progress.message);
+    });
 
+    setProgressMessage(null);
     setBusy(false);
   };
 
@@ -129,7 +140,7 @@ export default function App() {
         </p>
       )}
 
-      <StatusLine done={doneCount} total={cards.length} />
+      <StatusLine done={doneCount} total={cards.length} message={progressMessage} />
 
       {cards.length === 0 && !busy && !globalError && <EmptyState />}
 

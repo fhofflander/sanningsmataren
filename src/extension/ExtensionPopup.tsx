@@ -210,6 +210,7 @@ export function ExtensionPopup() {
   const [cards, setCards] = useState<CardState[]>([]);
   const [busy, setBusy] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const missingKeyMessage = missingRequiredKeyMessage(settings);
@@ -300,10 +301,12 @@ export function ExtensionPopup() {
 
   const handleUseSelection = async () => {
     setGlobalError(null);
+    setProgressMessage("Hämtar markerad text från aktiv flik...");
     if (!(await ensureHostAccess())) {
       setGlobalError(
         "Behörighet att läsa sidan nekades. Du kan klistra in texten manuellt istället.",
       );
+      setProgressMessage(null);
       return;
     }
     const foundSelection = await readActiveTabSelection();
@@ -311,15 +314,18 @@ export function ExtensionPopup() {
       setGlobalError(
         "Ingen markerad text hittades på den aktiva fliken. Markera texten och försök igen.",
       );
+      setProgressMessage(null);
       return;
     }
     setSelection(foundSelection);
     setInitialText(foundSelection.text);
     setInitialTextVersion((version) => version + 1);
+    setProgressMessage(null);
   };
 
   const handleSubmit = async (text: string) => {
     setGlobalError(null);
+    setProgressMessage(null);
     setCards([]);
 
     const keyError = missingRequiredKeyMessage(settings);
@@ -331,6 +337,7 @@ export function ExtensionPopup() {
 
     const provider = createProvider(settings);
     setBusy(true);
+    setProgressMessage("Läser texten och letar efter kontrollerbara påståenden...");
 
     let claims;
     try {
@@ -341,6 +348,7 @@ export function ExtensionPopup() {
           ? e.message
           : `Kunde inte extrahera påståenden: ${(e as Error).message}`,
       );
+      setProgressMessage(null);
       setBusy(false);
       return;
     }
@@ -349,28 +357,38 @@ export function ExtensionPopup() {
       setGlobalError(
         "Hittade inga kontrollerbara faktapåståenden i texten. Prova ett mer konkret citat.",
       );
+      setProgressMessage(null);
       setBusy(false);
       return;
     }
 
     setCards(claims.map((claim) => ({ claim, status: "pending" as const })));
+    setProgressMessage(
+      `Hittade ${claims.length} påståenden. Förbereder källgranskning...`,
+    );
 
-    await verifyClaims(provider, claims, CONCURRENCY, updateCard);
+    await verifyClaims(provider, claims, CONCURRENCY, updateCard, (progress) => {
+      setProgressMessage(progress.message);
+    });
 
+    setProgressMessage(null);
     setBusy(false);
   };
 
   const handleReviewPage = async () => {
     setGlobalError(null);
+    setProgressMessage("Läser hela sidan från aktiv flik...");
     if (!(await ensureHostAccess())) {
       setGlobalError(
         "Behörighet att läsa sidan nekades. Du kan klistra in texten manuellt istället.",
       );
+      setProgressMessage(null);
       return;
     }
     const foundPage = await readActiveTabPageText();
     if (!foundPage) {
       setGlobalError("Kunde inte läsa texten från den aktiva fliken.");
+      setProgressMessage(null);
       return;
     }
 
@@ -437,7 +455,7 @@ export function ExtensionPopup() {
         </p>
       )}
 
-      <StatusLine done={doneCount} total={cards.length} />
+      <StatusLine done={doneCount} total={cards.length} message={progressMessage} />
 
       {cards.length === 0 && !busy && !globalError && <EmptyState />}
 

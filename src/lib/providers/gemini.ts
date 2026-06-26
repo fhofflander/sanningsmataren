@@ -15,7 +15,7 @@ import {
 } from "../prompts";
 import { formatSearchResults, type SearchProvider } from "../search/brave";
 import { KeyError, type Claim, type Verdict } from "../types";
-import type { LLMProvider } from "./provider";
+import type { LLMProvider, ProgressReporter } from "./provider";
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const STANDARD_MODEL = "gemini-2.5-flash";
@@ -146,8 +146,12 @@ export function createGeminiProvider(
   async function verifyBatchWithModel(
     model: string,
     claims: Claim[],
+    reportProgress?: ProgressReporter,
   ): Promise<Verdict[]> {
     if (!options.searchProvider) {
+      reportProgress?.({
+        message: `Skickar ${claims.length} påståenden till modellen...`,
+      });
       return Promise.all(
         claims.map((claim) =>
           verifyWithModel(model, claim.pastaende, claim.talare, false),
@@ -155,18 +159,32 @@ export function createGeminiProvider(
       );
     }
 
+    let searchesDone = 0;
+    reportProgress?.({
+      message: `Söker källor med Brave (0 av ${claims.length})...`,
+    });
     const items = await Promise.all(
-      claims.map(async (claim, index) => ({
-        id: String(index + 1),
-        pastaende: claim.pastaende,
-        talare: claim.talare,
-        sources: formatSearchResults(
-          await options.searchProvider!.searchClaim(claim.pastaende, claim.talare),
-          MAX_BATCH_SOURCE_CHARS,
-        ),
-      })),
+      claims.map(async (claim, index) => {
+        const searchResults = await options.searchProvider!.searchClaim(
+          claim.pastaende,
+          claim.talare,
+        );
+        searchesDone += 1;
+        reportProgress?.({
+          message: `Söker källor med Brave (${searchesDone} av ${claims.length})...`,
+        });
+        return {
+          id: String(index + 1),
+          pastaende: claim.pastaende,
+          talare: claim.talare,
+          sources: formatSearchResults(searchResults, MAX_BATCH_SOURCE_CHARS),
+        };
+      }),
     );
 
+    reportProgress?.({
+      message: `Skickar ${claims.length} påståenden och källor till modellen...`,
+    });
     const out = await callGemini(
       apiKey,
       model,
@@ -174,6 +192,7 @@ export function createGeminiProvider(
       verifyBatchUserMessageWithSources(items),
       false,
     );
+    reportProgress?.({ message: "Tolkar modellens samlade svar..." });
     return parseBatchOutput(out, claims);
   }
 
@@ -204,9 +223,12 @@ export function createGeminiProvider(
   };
 
   if (options.costMode === "budget" && options.searchProvider) {
-    provider.verifyBatch = async (claims: Claim[]): Promise<Verdict[]> => {
+    provider.verifyBatch = async (
+      claims: Claim[],
+      reportProgress?: ProgressReporter,
+    ): Promise<Verdict[]> => {
       if (claims.length === 0) return [];
-      return verifyBatchWithModel(BUDGET_VERIFY_MODEL, claims);
+      return verifyBatchWithModel(BUDGET_VERIFY_MODEL, claims, reportProgress);
     };
   }
 

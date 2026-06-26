@@ -1,5 +1,5 @@
 import { runPool } from "./concurrency";
-import type { LLMProvider } from "./providers";
+import type { LLMProvider, ProgressReporter } from "./providers";
 import { KeyError, type Claim, type Verdict } from "./types";
 
 type CardUpdate =
@@ -15,13 +15,18 @@ export async function verifyClaims(
   claims: Claim[],
   concurrency: number,
   updateCard: (index: number, patch: CardUpdate) => void,
+  reportProgress?: ProgressReporter,
 ): Promise<void> {
   if (claims.length > 1 && provider.verifyBatch) {
     try {
-      const verdicts = await provider.verifyBatch(claims);
+      reportProgress?.({
+        message: `Förbereder samlad granskning av ${claims.length} påståenden...`,
+      });
+      const verdicts = await provider.verifyBatch(claims, reportProgress);
       if (verdicts.length !== claims.length) {
         throw new Error("Batchsvaret hade fel antal omdömen.");
       }
+      reportProgress?.({ message: "Lägger in omdömena i resultatlistan..." });
       verdicts.forEach((verdict, index) => {
         updateCard(index, { status: "done", verdict });
       });
@@ -35,8 +40,17 @@ export async function verifyClaims(
     }
   }
 
+  reportProgress?.({
+    message:
+      claims.length === 1
+        ? "Granskar påståendet mot källor..."
+        : `Granskar ${claims.length} påståenden mot källor...`,
+  });
   await runPool(claims.length, concurrency, async (i) => {
     try {
+      reportProgress?.({
+        message: `Startar granskning av påstående ${i + 1} av ${claims.length}...`,
+      });
       const verdict = await provider.verify(claims[i].pastaende, claims[i].talare);
       updateCard(i, { status: "done", verdict });
     } catch (e) {

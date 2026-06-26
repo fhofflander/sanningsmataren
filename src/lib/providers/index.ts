@@ -4,7 +4,7 @@ import { createAnthropicProvider } from "./anthropic";
 import { createGeminiProvider } from "./gemini";
 import type { LLMProvider } from "./provider";
 
-export type { LLMProvider } from "./provider";
+export type { LLMProvider, ProgressReporter, ProgressUpdate } from "./provider";
 
 export function createProvider(settings: Settings): LLMProvider {
   const searchProvider =
