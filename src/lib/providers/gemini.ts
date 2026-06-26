@@ -20,7 +20,8 @@ import type { LLMProvider } from "./provider";
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const STANDARD_MODEL = "gemini-2.5-flash";
-const BUDGET_MODEL = "gemini-2.5-flash-lite";
+const BUDGET_EXTRACT_MODEL = "gemini-2.5-flash-lite";
+const BUDGET_VERIFY_MODEL = STANDARD_MODEL;
 const EMPTY_EXTRACT_RETRY_MIN_CHARS = 280;
 const MAX_BATCH_SOURCE_CHARS = 3800;
 
@@ -92,7 +93,7 @@ export function createGeminiProvider(
   options: ProviderOptions,
 ): LLMProvider {
   const extractModel =
-    options.costMode === "budget" ? BUDGET_MODEL : STANDARD_MODEL;
+    options.costMode === "budget" ? BUDGET_EXTRACT_MODEL : STANDARD_MODEL;
 
   async function extractWithModel(model: string, text: string): Promise<Claim[]> {
     const out = await callGemini(
@@ -202,7 +203,7 @@ export function createGeminiProvider(
       let budgetVerdict: Verdict;
       try {
         budgetVerdict = await verifyWithModel(
-          BUDGET_MODEL,
+          BUDGET_VERIFY_MODEL,
           pastaende,
           talare,
           true,
@@ -212,7 +213,10 @@ export function createGeminiProvider(
         return verifyWithModel(STANDARD_MODEL, pastaende, talare, true);
       }
 
-      if (shouldEscalateVerdict(budgetVerdict)) {
+      if (
+        BUDGET_VERIFY_MODEL !== STANDARD_MODEL &&
+        shouldEscalateVerdict(budgetVerdict)
+      ) {
         return verifyWithModel(STANDARD_MODEL, pastaende, talare, true);
       }
       return budgetVerdict;
@@ -225,7 +229,7 @@ export function createGeminiProvider(
 
       let budgetVerdicts: Verdict[];
       try {
-        budgetVerdicts = await verifyBatchWithModel(BUDGET_MODEL, claims);
+        budgetVerdicts = await verifyBatchWithModel(BUDGET_VERIFY_MODEL, claims);
       } catch (e) {
         if (e instanceof KeyError) throw e;
         return Promise.all(
@@ -238,7 +242,12 @@ export function createGeminiProvider(
       const finalVerdicts = [...budgetVerdicts];
       await Promise.all(
         budgetVerdicts.map(async (verdict, index) => {
-          if (!shouldEscalateVerdict(verdict)) return;
+          if (
+            BUDGET_VERIFY_MODEL === STANDARD_MODEL ||
+            !shouldEscalateVerdict(verdict)
+          ) {
+            return;
+          }
           const claim = claims[index];
           finalVerdicts[index] = await verifyWithModel(
             STANDARD_MODEL,

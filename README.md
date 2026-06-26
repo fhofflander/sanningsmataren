@@ -21,12 +21,12 @@ Netlify, GitHub Pages).
 1. **extract(text)** - one AI call (no web search) pulls out up to 6 concrete,
    checkable claims as JSON.
 2. **verify(claims)** - in **Budgetläge**, one Brave Search request per claim
-   gathers source snippets, then one cheap batch AI call judges all claims
-   together without model-native web search. If individual answers are uncertain,
-   the app retries those claims with the standard model using the same Brave
-   results. In **Standard**, the selected AI provider uses its built-in web
-   search directly per claim. Verdicts stream progressively in Standard; in
-   Budgetläge batch verdicts arrive together.
+   gathers source snippets, then one batched AI call judges all claims together
+   without model-native web search. Budget verification uses the same stronger
+   verifier model as Standard, but avoids the provider's built-in search cost.
+   In **Standard**, the selected AI provider uses its built-in web search
+   directly per claim. Verdicts stream progressively in Standard; in Budgetläge
+   batch verdicts arrive together.
 
 ### Verdict scale
 
@@ -53,12 +53,10 @@ fact-checkers (Källkritikbyrån, SVT Verifierar).
 You choose a provider in the in-app settings and paste your own key for it.
 The settings panel also has two cost modes:
 
-- **Budgetläge** (default): uses the cheaper model first and automatically
-  grounds verification through your own Brave Search API key. This avoids the
+- **Budgetläge** (default): grounds verification through your own Brave Search
+  API key and uses the same stronger verifier model as Standard. This avoids the
   expensive built-in web search tools in normal budget checks. Multiple claims
-  are judged in one batch call to reduce per-call overhead. If an individual
-  answer is inconclusive, source-less, or otherwise uncertain, the app escalates
-  that claim to the standard model while reusing the same Brave search results.
+  are judged in one batch call to reduce per-call overhead.
 - **Standard**: uses the standard verifier directly, matching the original
   behavior with the AI provider's built-in web search.
 
@@ -162,11 +160,10 @@ recommended flow is to ship keyless and let each user enter their own key.
 ## Cost
 
 Each submission costs one extract call. In Budgetläge, each claim costs one Brave
-Search request, but all claims are usually judged in one cheap batch verifier
-call. Uncertain claims may add individual standard verifier calls while reusing
-the same Brave search results. In Standard, each claim uses the selected
-provider's built-in web search, which can be more expensive but may be stronger
-for difficult checks.
+Search request, but all claims are usually judged in one batch verifier call with
+the stronger verifier model. In Standard, each claim uses the selected provider's
+built-in web search, which can be more expensive but may be stronger for
+difficult checks.
 
 ## Limitations
 

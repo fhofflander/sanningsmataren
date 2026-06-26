@@ -20,7 +20,7 @@ import type { LLMProvider } from "./provider";
 const URL = "https://api.anthropic.com/v1/messages";
 const EXTRACT_MODEL = "claude-haiku-4-5-20251001";
 const VERIFY_MODEL = "claude-sonnet-4-6";
-const BUDGET_VERIFY_MODEL = EXTRACT_MODEL;
+const BUDGET_VERIFY_MODEL = VERIFY_MODEL;
 const EMPTY_EXTRACT_RETRY_MIN_CHARS = 280;
 const MAX_BATCH_SOURCE_CHARS = 3800;
 
@@ -234,7 +234,10 @@ export function createAnthropicProvider(
         return verifyWithModel(VERIFY_MODEL, pastaende, talare, true);
       }
 
-      if (shouldEscalateVerdict(budgetVerdict)) {
+      if (
+        BUDGET_VERIFY_MODEL !== VERIFY_MODEL &&
+        shouldEscalateVerdict(budgetVerdict)
+      ) {
         return verifyWithModel(VERIFY_MODEL, pastaende, talare, true);
       }
       return budgetVerdict;
@@ -260,7 +263,12 @@ export function createAnthropicProvider(
       const finalVerdicts = [...budgetVerdicts];
       await Promise.all(
         budgetVerdicts.map(async (verdict, index) => {
-          if (!shouldEscalateVerdict(verdict)) return;
+          if (
+            BUDGET_VERIFY_MODEL === VERIFY_MODEL ||
+            !shouldEscalateVerdict(verdict)
+          ) {
+            return;
+          }
           const claim = claims[index];
           finalVerdicts[index] = await verifyWithModel(
             VERIFY_MODEL,
