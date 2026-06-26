@@ -5,4 +5,5 @@ import type { Claim, Verdict } from "../types";
 export interface LLMProvider {
   extract(text: string): Promise<Claim[]>;
   verify(pastaende: string, talare: string): Promise<Verdict>;
+  verifyBatch?(claims: Claim[]): Promise<Verdict[]>;
 }

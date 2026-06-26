@@ -3,11 +3,13 @@
 // no proxy or special header is required. Web search uses the google_search
 // grounding tool.
 
-import { parseClaims, parseVerdict } from "../json";
+import { parseBatchVerdicts, parseClaims, parseVerdict } from "../json";
 import {
   EXTRACT_SYSTEM_PROMPT,
+  VERIFY_BATCH_WITH_CONTEXT_SYSTEM_PROMPT,
   VERIFY_SYSTEM_PROMPT,
   VERIFY_WITH_CONTEXT_SYSTEM_PROMPT,
+  verifyBatchUserMessageWithSources,
   verifyUserMessage,
   verifyUserMessageWithSources,
 } from "../prompts";
@@ -20,6 +22,7 @@ const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const STANDARD_MODEL = "gemini-2.5-flash";
 const BUDGET_MODEL = "gemini-2.5-flash-lite";
 const EMPTY_EXTRACT_RETRY_MIN_CHARS = 280;
+const MAX_BATCH_SOURCE_CHARS = 3800;
 
 interface ProviderOptions {
   costMode: "budget" | "standard";
@@ -128,7 +131,53 @@ export function createGeminiProvider(
     return parseVerdict(out);
   }
 
-  return {
+  function parseBatchOutput(out: string, claims: Claim[]): Verdict[] {
+    const parsed = parseBatchVerdicts(out);
+    const byId = new Map(parsed.map((item) => [item.id, item.verdict]));
+    const verdicts = claims.map((_, index) => byId.get(String(index + 1)));
+
+    if (verdicts.some((verdict) => !verdict)) {
+      throw new Error("Batchsvaret saknade omdömen för ett eller flera påståenden.");
+    }
+
+    return verdicts as Verdict[];
+  }
+
+  async function verifyBatchWithModel(
+    model: string,
+    claims: Claim[],
+  ): Promise<Verdict[]> {
+    if (!options.searchProvider) {
+      return Promise.all(
+        claims.map((claim) =>
+          verifyWithModel(model, claim.pastaende, claim.talare, false),
+        ),
+      );
+    }
+
+    const items = await Promise.all(
+      claims.map(async (claim, index) => ({
+        id: String(index + 1),
+        pastaende: claim.pastaende,
+        talare: claim.talare,
+        sources: formatSearchResults(
+          await options.searchProvider!.searchClaim(claim.pastaende, claim.talare),
+          MAX_BATCH_SOURCE_CHARS,
+        ),
+      })),
+    );
+
+    const out = await callGemini(
+      apiKey,
+      model,
+      VERIFY_BATCH_WITH_CONTEXT_SYSTEM_PROMPT,
+      verifyBatchUserMessageWithSources(items),
+      false,
+    );
+    return parseBatchOutput(out, claims);
+  }
+
+  const provider: LLMProvider = {
     async extract(text: string): Promise<Claim[]> {
       if (options.costMode !== "budget") {
         return extractWithModel(STANDARD_MODEL, text);
@@ -169,4 +218,39 @@ export function createGeminiProvider(
       return budgetVerdict;
     },
   };
+
+  if (options.costMode === "budget" && options.searchProvider) {
+    provider.verifyBatch = async (claims: Claim[]): Promise<Verdict[]> => {
+      if (claims.length === 0) return [];
+
+      let budgetVerdicts: Verdict[];
+      try {
+        budgetVerdicts = await verifyBatchWithModel(BUDGET_MODEL, claims);
+      } catch (e) {
+        if (e instanceof KeyError) throw e;
+        return Promise.all(
+          claims.map((claim) =>
+            verifyWithModel(STANDARD_MODEL, claim.pastaende, claim.talare, true),
+          ),
+        );
+      }
+
+      const finalVerdicts = [...budgetVerdicts];
+      await Promise.all(
+        budgetVerdicts.map(async (verdict, index) => {
+          if (!shouldEscalateVerdict(verdict)) return;
+          const claim = claims[index];
+          finalVerdicts[index] = await verifyWithModel(
+            STANDARD_MODEL,
+            claim.pastaende,
+            claim.talare,
+            true,
+          );
+        }),
+      );
+      return finalVerdicts;
+    };
+  }
+
+  return provider;
 }

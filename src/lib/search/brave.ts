@@ -219,7 +219,10 @@ export function createBraveSearchProvider(apiKey: string): SearchProvider {
   };
 }
 
-export function formatSearchResults(results: SearchResult[]): string {
+export function formatSearchResults(
+  results: SearchResult[],
+  maxChars = MAX_SOURCE_TEXT_CHARS,
+): string {
   if (results.length === 0) {
     return "Inga relevanta sökresultat hittades.";
   }
@@ -231,5 +234,5 @@ export function formatSearchResults(results: SearchResult[]): string {
     })
     .join("\n\n");
 
-  return truncateAtWord(formatted, MAX_SOURCE_TEXT_CHARS);
+  return truncateAtWord(formatted, maxChars);
 }

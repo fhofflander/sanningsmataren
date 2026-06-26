@@ -6,7 +6,6 @@ import { EmptyState } from "../components/EmptyState";
 import { KeyNotice } from "../components/KeyNotice";
 import { Settings } from "../components/Settings";
 import { StatusLine } from "../components/StatusLine";
-import { runPool } from "../lib/concurrency";
 import { createProvider } from "../lib/providers";
 import { missingRequiredKeyMessage } from "../lib/storage";
 import {
@@ -18,6 +17,7 @@ import {
   saveExtensionSettings,
 } from "../lib/extensionStorage";
 import { KeyError, type Settings as SettingsType } from "../lib/types";
+import { verifyClaims } from "../lib/verification";
 
 const CONCURRENCY = 3;
 const MIN_PAGE_TEXT_LENGTH = 20;
@@ -355,18 +355,7 @@ export function ExtensionPopup() {
 
     setCards(claims.map((claim) => ({ claim, status: "pending" as const })));
 
-    await runPool(claims.length, CONCURRENCY, async (i) => {
-      try {
-        const verdict = await provider.verify(
-          claims[i].pastaende,
-          claims[i].talare,
-        );
-        updateCard(i, { status: "done", verdict });
-      } catch (e) {
-        const msg = e instanceof KeyError ? e.message : (e as Error).message;
-        updateCard(i, { status: "error", error: msg });
-      }
-    });
+    await verifyClaims(provider, claims, CONCURRENCY, updateCard);
 
     setBusy(false);
   };
