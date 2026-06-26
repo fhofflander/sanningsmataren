@@ -14,7 +14,6 @@ import {
 } from "../prompts";
 import { formatSearchResults, type SearchProvider } from "../search/brave";
 import { KeyError, type Claim, type Verdict } from "../types";
-import { shouldEscalateVerdict } from "./escalation";
 import type { LLMProvider } from "./provider";
 
 const URL = "https://api.anthropic.com/v1/messages";
@@ -221,64 +220,14 @@ export function createAnthropicProvider(
         return verifyWithModel(VERIFY_MODEL, pastaende, talare, false);
       }
 
-      let budgetVerdict: Verdict;
-      try {
-        budgetVerdict = await verifyWithModel(
-          BUDGET_VERIFY_MODEL,
-          pastaende,
-          talare,
-          true,
-        );
-      } catch (e) {
-        if (e instanceof KeyError) throw e;
-        return verifyWithModel(VERIFY_MODEL, pastaende, talare, true);
-      }
-
-      if (
-        BUDGET_VERIFY_MODEL !== VERIFY_MODEL &&
-        shouldEscalateVerdict(budgetVerdict)
-      ) {
-        return verifyWithModel(VERIFY_MODEL, pastaende, talare, true);
-      }
-      return budgetVerdict;
+      return verifyWithModel(BUDGET_VERIFY_MODEL, pastaende, talare, true);
     },
   };
 
   if (options.costMode === "budget" && options.searchProvider) {
     provider.verifyBatch = async (claims: Claim[]): Promise<Verdict[]> => {
       if (claims.length === 0) return [];
-
-      let budgetVerdicts: Verdict[];
-      try {
-        budgetVerdicts = await verifyBatchWithModel(BUDGET_VERIFY_MODEL, claims);
-      } catch (e) {
-        if (e instanceof KeyError) throw e;
-        return Promise.all(
-          claims.map((claim) =>
-            verifyWithModel(VERIFY_MODEL, claim.pastaende, claim.talare, true),
-          ),
-        );
-      }
-
-      const finalVerdicts = [...budgetVerdicts];
-      await Promise.all(
-        budgetVerdicts.map(async (verdict, index) => {
-          if (
-            BUDGET_VERIFY_MODEL === VERIFY_MODEL ||
-            !shouldEscalateVerdict(verdict)
-          ) {
-            return;
-          }
-          const claim = claims[index];
-          finalVerdicts[index] = await verifyWithModel(
-            VERIFY_MODEL,
-            claim.pastaende,
-            claim.talare,
-            true,
-          );
-        }),
-      );
-      return finalVerdicts;
+      return verifyBatchWithModel(BUDGET_VERIFY_MODEL, claims);
     };
   }
 
