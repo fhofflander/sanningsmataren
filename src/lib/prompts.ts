@@ -76,7 +76,7 @@ förslag vs antagen lag och korrelation vs orsakssamband.
 ${STRICT_MISLEADING_GUIDANCE}
 Granska alla partier med samma måttstock.
 Hitta aldrig på siffror eller källor. Om sökunderlaget för ett id inte räcker, använd "GÅR EJ ATT AVGÖRA" för just det id:t och förklara kort vad som saknas.
-Avsluta ditt svar med ENBART en JSON-array utan kodstaket. Arrayen ska ha exakt ett objekt per id och behålla samma id:n:
+Svara med ENBART en JSON-array utan kodstaket, rubrik eller förklarande text. Arrayen ska ha exakt ett objekt per id, behålla samma id:n och får inte omslutas av ett extra objekt:
 [{"id":"1","omdome":"SANT|MESTADELS SANT|VILSELEDANDE|MESTADELS FALSKT|FALSKT|GÅR EJ ATT AVGÖRA",
 "motivering":"2-3 meningar på svenska","kallor":[{"titel":"kort titel","url":"https://..."}],
 "osakerhet":"kort eller tom sträng"}]`;
@@ -104,5 +104,5 @@ export function verifyBatchUserMessageWithSources(
     )
     .join("\n\n---\n\n");
 
-  return `Granska följande påståenden. Returnera exakt ett JSON-objekt per id i samma ordning.\n\n${formattedItems}`;
+  return `Granska följande påståenden. Returnera exakt en JSON-array med ett JSON-objekt per id i samma ordning. Skriv inget före eller efter arrayen.\n\n${formattedItems}`;
 }

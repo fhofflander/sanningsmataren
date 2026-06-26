@@ -49,12 +49,13 @@ interface CallOptions {
   system: string;
   user: string;
   searchToolVersion?: string;
+  maxTokens?: number;
 }
 
 async function rawCall(apiKey: string, opts: CallOptions): Promise<Response> {
   const body: Record<string, unknown> = {
     model: opts.model,
-    max_tokens: 1500,
+    max_tokens: opts.maxTokens ?? 1500,
     system: opts.system,
     messages: [{ role: "user", content: opts.user }],
   };
@@ -89,6 +90,7 @@ async function callAnthropic(
   system: string,
   user: string,
   withSearch: boolean,
+  maxTokens?: number,
 ): Promise<string> {
   const versions = withSearch ? WEB_SEARCH_VERSIONS : [undefined];
 
@@ -96,7 +98,13 @@ async function callAnthropic(
   for (const searchToolVersion of versions) {
     let res: Response;
     try {
-      res = await rawCall(apiKey, { model, system, user, searchToolVersion });
+      res = await rawCall(apiKey, {
+        model,
+        system,
+        user,
+        searchToolVersion,
+        maxTokens,
+      });
     } catch (e) {
       throw new Error(`Nätverksfel mot Anthropic: ${(e as Error).message}`);
     }
@@ -221,6 +229,7 @@ export function createAnthropicProvider(
       VERIFY_BATCH_WITH_CONTEXT_SYSTEM_PROMPT,
       verifyBatchUserMessageWithSources(items),
       false,
+      Math.min(6000, Math.max(2500, claims.length * 900)),
     );
     reportProgress?.({ message: "Tolkar modellens samlade svar..." });
     return parseBatchOutput(out, claims);

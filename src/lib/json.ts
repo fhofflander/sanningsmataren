@@ -64,6 +64,62 @@ function lastJsonArray(text: string): string | null {
   return null;
 }
 
+function extractJsonObjects(text: string): unknown[] {
+  const objects: unknown[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (c === "\\") {
+        escaped = true;
+      } else if (c === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (c === "\"") {
+      inString = true;
+    } else if (c === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (c === "}") {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        try {
+          objects.push(JSON.parse(text.slice(start, i + 1)));
+        } catch {
+          // Ignore prose snippets that only look like JSON.
+        }
+        start = -1;
+      }
+    }
+  }
+
+  return objects;
+}
+
+function unwrapBatchVerdicts(raw: unknown): unknown[] | null {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw !== "object" || raw === null) return null;
+
+  const obj = raw as Record<string, unknown>;
+  const knownKeys = ["omdomen", "verdicts", "results", "items", "data"];
+  for (const key of knownKeys) {
+    if (Array.isArray(obj[key])) return obj[key] as unknown[];
+  }
+
+  const firstArray = Object.values(obj).find((value) => Array.isArray(value));
+  return Array.isArray(firstArray) ? firstArray : null;
+}
+
 function normalizeVerdict(raw: Record<string, unknown>): Verdict {
   const omdome = String(raw.omdome ?? "").toUpperCase().trim() as Omdome;
   const kallorRaw = Array.isArray(raw.kallor) ? raw.kallor : [];
@@ -128,22 +184,50 @@ export function parseBatchVerdicts(text: string): BatchVerdict[] {
   try {
     raw = JSON.parse(cleaned);
   } catch {
-    const arrText = lastJsonArray(cleaned);
-    if (!arrText) {
-      throw new Error("Hittade ingen JSON-lista med omdömen i modellens svar.");
+    const objectItems = extractJsonObjects(cleaned).filter(
+      (item): item is Record<string, unknown> =>
+        typeof item === "object" &&
+        item !== null &&
+        ("id" in item ||
+          "claimId" in item ||
+          "omdome" in item ||
+          "verdict" in item),
+    );
+
+    if (objectItems.length > 0) {
+      raw = objectItems;
+    } else {
+      const arrText = lastJsonArray(cleaned);
+      if (!arrText) {
+        raw = [];
+      } else {
+        raw = JSON.parse(arrText);
+      }
     }
-    raw = JSON.parse(arrText);
   }
 
-  if (!Array.isArray(raw)) {
+  const items = unwrapBatchVerdicts(raw);
+  if (!items) {
     throw new Error("Modellens svar var inte en lista med omdömen.");
   }
 
-  return raw
+  if (items.length === 0) {
+    throw new Error("Hittade ingen JSON-lista med omdömen i modellens svar.");
+  }
+
+  return items
     .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
-    .map((item, index) => ({
-      id: String(item.id ?? item.claimId ?? index + 1).trim(),
-      verdict: normalizeVerdict(item),
-    }))
+    .map((item, index) => {
+      const nestedVerdict =
+        typeof item.verdict === "object" && item.verdict !== null
+          ? (item.verdict as Record<string, unknown>)
+          : null;
+      return {
+        id: String(
+          item.id ?? item.claimId ?? nestedVerdict?.id ?? nestedVerdict?.claimId ?? index + 1,
+        ).trim(),
+        verdict: normalizeVerdict(nestedVerdict ?? item),
+      };
+    })
     .filter((item) => item.id.length > 0);
 }
