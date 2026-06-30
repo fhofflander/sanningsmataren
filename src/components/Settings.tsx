@@ -31,13 +31,19 @@ export function Settings({ settings, onSave, onClear, open, onOpenChange }: Prop
 
   const handleClear = () => {
     onClear();
-    setDraft((d) => ({ ...d, geminiKey: "", anthropicKey: "" }));
+    setDraft((d) => ({
+      ...d,
+      geminiKey: "",
+      anthropicKey: "",
+      braveSearchKey: "",
+    }));
     setSaved(false);
   };
 
   const keyValue =
     draft.provider === "anthropic" ? draft.anthropicKey : draft.geminiKey;
   const isAnthropic = draft.provider === "anthropic";
+  const usesBudgetSearch = draft.costMode === "budget";
   const keyLink = isAnthropic
     ? "https://console.anthropic.com/"
     : "https://aistudio.google.com/apikey";
@@ -48,7 +54,7 @@ export function Settings({ settings, onSave, onClear, open, onOpenChange }: Prop
   return (
     <section
       className="rounded-lg border border-line bg-surface shadow-sm"
-      aria-label="Inställningar och API-nyckel"
+      aria-label="Inställningar och API-nycklar"
     >
       <button
         onClick={() => onOpenChange(!open)}
@@ -56,7 +62,7 @@ export function Settings({ settings, onSave, onClear, open, onOpenChange }: Prop
         className="flex w-full items-center justify-between px-5 py-3 text-left"
       >
         <span className="font-mono text-xs uppercase tracking-widest text-ink-muted">
-          Inställningar / API-nyckel
+          Inställningar / API-nycklar
         </span>
         <span
           className="font-mono text-xs text-ink-faint transition-transform"
@@ -161,9 +167,44 @@ export function Settings({ settings, onSave, onClear, open, onOpenChange }: Prop
             </p>
           </div>
 
+          {usesBudgetSearch && (
+            <div>
+              <label
+                htmlFor="sm-brave-search-key"
+                className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-ink-faint"
+              >
+                Brave Search API-nyckel (budgetläge)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="sm-brave-search-key"
+                  type={showKey ? "text" : "password"}
+                  value={draft.braveSearchKey}
+                  onChange={(e) => update({ braveSearchKey: e.target.value })}
+                  placeholder="Brave Search API key"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="w-full rounded-md border border-line-strong px-3 py-2 font-mono text-sm focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
+                />
+                <a
+                  href="https://api-dashboard.search.brave.com/app/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex shrink-0 items-center rounded-md border border-line px-3 font-mono text-xs uppercase tracking-wide text-ink-muted hover:border-line-strong"
+                >
+                  Hämta
+                </a>
+              </div>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-ink-muted">
+                Används bara för den billiga webbsökningen i budgetläge.
+              </p>
+            </div>
+          )}
+
           <p className="rounded-md border-l-2 border-line-strong bg-surface-muted px-3 py-2 text-xs leading-relaxed text-ink-muted">
             Nyckeln sparas endast lokalt i din webbläsare (localStorage) och
-            skickas bara direkt till {PROVIDER_LABELS[draft.provider]}. Den når
+            skickas bara direkt till {PROVIDER_LABELS[draft.provider]}
+            {usesBudgetSearch ? " och Brave Search" : ""}. Den når
             aldrig någon annan server - appen har ingen backend.
           </p>
 

@@ -4,8 +4,9 @@ export function KeyNotice({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
     <div className="rounded-lg border border-accent/30 bg-accent-soft/50 px-4 py-3">
       <p className="text-sm leading-relaxed text-ink">
-        För att granska behöver du en egen API-nyckel - oftast gratis att skapa.
-        Nyckeln sparas bara i din webbläsare och skickas direkt till AI-tjänsten.
+        För att granska behöver du egna API-nycklar - oftast gratis att skapa
+        för lätt användning. Nycklarna sparas bara i din webbläsare och skickas
+        direkt till respektive tjänst.
       </p>
       <button
         onClick={onOpenSettings}

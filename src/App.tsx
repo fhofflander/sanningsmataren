@@ -6,30 +6,34 @@ import { EmptyState } from "./components/EmptyState";
 import { KeyNotice } from "./components/KeyNotice";
 import { Settings } from "./components/Settings";
 import { StatusLine } from "./components/StatusLine";
-import { runPool } from "./lib/concurrency";
 import { createProvider } from "./lib/providers";
 import {
-  activeKey,
   loadSettings,
+  missingRequiredKeyMessage,
   saveSettings,
   clearKeys,
 } from "./lib/storage";
 import { KeyError, type Settings as SettingsType } from "./lib/types";
+import { verifyClaims } from "./lib/verification";
 
 const CONCURRENCY = 3;
 
 export default function App() {
   const [settings, setSettings] = useState<SettingsType>(() => loadSettings());
-  const [settingsOpen, setSettingsOpen] = useState(() => !activeKey(loadSettings()));
+  const [settingsOpen, setSettingsOpen] = useState(
+    () => !!missingRequiredKeyMessage(loadSettings()),
+  );
   const [cards, setCards] = useState<CardState[]>([]);
   const [busy, setBusy] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
 
   const doneCount = useMemo(
     () => cards.filter((c) => c.status !== "pending").length,
     [cards],
   );
-  const hasKey = !!activeKey(settings);
+  const missingKeyMessage = missingRequiredKeyMessage(settings);
+  const hasKey = !missingKeyMessage;
 
   const handleSave = (next: SettingsType) => {
     setSettings(next);
@@ -38,7 +42,12 @@ export default function App() {
 
   const handleClear = () => {
     clearKeys();
-    setSettings((s) => ({ ...s, geminiKey: "", anthropicKey: "" }));
+    setSettings((s) => ({
+      ...s,
+      geminiKey: "",
+      anthropicKey: "",
+      braveSearchKey: "",
+    }));
   };
 
   const updateCard = (index: number, patch: Partial<CardState>) => {
@@ -49,18 +58,19 @@ export default function App() {
 
   const handleSubmit = async (text: string) => {
     setGlobalError(null);
+    setProgressMessage(null);
     setCards([]);
 
-    if (!activeKey(settings)) {
-      setGlobalError(
-        "Ingen API-nyckel angiven. Öppna Inställningar och klistra in din nyckel.",
-      );
+    const keyError = missingRequiredKeyMessage(settings);
+    if (keyError) {
+      setGlobalError(keyError);
       setSettingsOpen(true);
       return;
     }
 
     const provider = createProvider(settings);
     setBusy(true);
+    setProgressMessage("Läser texten och letar efter kontrollerbara påståenden...");
 
     let claims;
     try {
@@ -71,6 +81,7 @@ export default function App() {
           ? e.message
           : `Kunde inte extrahera påståenden: ${(e as Error).message}`,
       );
+      setProgressMessage(null);
       setBusy(false);
       return;
     }
@@ -79,25 +90,21 @@ export default function App() {
       setGlobalError(
         "Hittade inga kontrollerbara faktapåståenden i texten. Prova ett mer konkret citat.",
       );
+      setProgressMessage(null);
       setBusy(false);
       return;
     }
 
     setCards(claims.map((claim) => ({ claim, status: "pending" as const })));
+    setProgressMessage(
+      `Hittade ${claims.length} påståenden. Förbereder källgranskning...`,
+    );
 
-    await runPool(claims.length, CONCURRENCY, async (i) => {
-      try {
-        const verdict = await provider.verify(
-          claims[i].pastaende,
-          claims[i].talare,
-        );
-        updateCard(i, { status: "done", verdict });
-      } catch (e) {
-        const msg = e instanceof KeyError ? e.message : (e as Error).message;
-        updateCard(i, { status: "error", error: msg });
-      }
+    await verifyClaims(provider, claims, CONCURRENCY, updateCard, (progress) => {
+      setProgressMessage(progress.message);
     });
 
+    setProgressMessage(null);
     setBusy(false);
   };
 
@@ -133,7 +140,7 @@ export default function App() {
         </p>
       )}
 
-      <StatusLine done={doneCount} total={cards.length} />
+      <StatusLine done={doneCount} total={cards.length} message={progressMessage} />
 
       {cards.length === 0 && !busy && !globalError && <EmptyState />}
 

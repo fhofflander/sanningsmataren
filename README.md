@@ -8,7 +8,7 @@ Swedish primary sources.
 > **Svenska:** Sanningsmätaren är ett verktyg för att faktagranska svensk
 > politik. Klistra in en text så plockar appen ut de kontrollerbara
 > faktapåståendena och ger varje påstående ett sourcat omdöme på en skala från
-> **FALSKT** till **SANT**. Appen har ingen backend - din API-nyckel sparas
+> **FALSKT** till **SANT**. Appen har ingen backend - dina API-nycklar sparas
 > bara lokalt i din webbläsare.
 
 There is **no backend and no server-side key**. The app is a purely static
@@ -20,8 +20,13 @@ Netlify, GitHub Pages).
 
 1. **extract(text)** - one AI call (no web search) pulls out up to 6 concrete,
    checkable claims as JSON.
-2. **verify(claim)** - one AI call *with web search* per claim. Verdicts stream
-   in progressively (max 3 in flight), each filling its card as it returns.
+2. **verify(claims)** - in **Budgetläge**, one Brave Search request per claim
+   gathers source snippets, then one batched AI call judges all claims together
+   without model-native web search. Budget verification uses the same stronger
+   verifier model as Standard, but avoids the provider's built-in search cost.
+   In **Standard**, the selected AI provider uses its built-in web search
+   directly per claim. Verdicts stream progressively in Standard; in Budgetläge
+   batch verdicts arrive together.
 
 ### Verdict scale
 
@@ -48,24 +53,39 @@ fact-checkers (Källkritikbyrån, SVT Verifierar).
 You choose a provider in the in-app settings and paste your own key for it.
 The settings panel also has two cost modes:
 
-- **Budgetläge** (default): uses the cheaper model first and automatically
-  escalates to the standard verifier if the first answer is inconclusive,
-  source-less, or otherwise uncertain.
+- **Budgetläge** (default): grounds verification through your own Brave Search
+  API key and uses the same stronger verifier model as Standard. This avoids the
+  expensive built-in web search tools in normal budget checks. Multiple claims
+  are judged in one batch call to reduce per-call overhead.
 - **Standard**: uses the standard verifier directly, matching the original
-  behavior.
+  behavior with the AI provider's built-in web search.
+
+### Brave Search (budget search)
+
+Budgetläge requires a Brave Search API key in addition to your AI provider key.
+Get one at <https://api-dashboard.search.brave.com/app/keys> and paste it into
+the Brave field in settings. The key is stored locally and sent only to Brave
+Search.
+
+Brave Search requires its API key in an HTTP header and does not currently
+respond to normal browser CORS preflight requests. That means Brave Budgetläge
+is intended for the Chrome extension, where `host_permissions` allow the direct
+request. A plain hosted web app needs Standard mode or a small search proxy.
 
 ### Google Gemini (free tier, default)
 
 1. Get a key at <https://aistudio.google.com/apikey>.
-2. Paste it into the app's settings. Web search uses Gemini's built-in
-   **Google Search grounding** - no extra setup needed.
+2. Paste it into the app's settings. In Budgetläge, verification uses Brave
+   Search snippets. In Standard, verification uses Gemini's built-in
+   **Google Search grounding**.
 
 ### Anthropic Claude
 
 1. Get a key at <https://console.anthropic.com/>.
 2. **Enable web search for your organization** in the Claude Console - the
-   verify step relies on Anthropic's `web_search` server tool, which must be
-   enabled for your org or the call will fail.
+   Standard verify step relies on Anthropic's `web_search` server tool, which
+   must be enabled for your org or the call will fail. Budgetläge uses Brave
+   Search instead.
 3. Calls are made directly from the browser with the
    `anthropic-dangerous-direct-browser-access: true` header.
 
@@ -76,7 +96,7 @@ npm install
 npm run dev
 ```
 
-Then open the dev URL, paste your key into **Inställningar / API-nyckel**, and
+Then open the dev URL, paste your keys into **Inställningar / API-nycklar**, and
 paste some text to check.
 
 ## Run as a Chrome extension
@@ -109,7 +129,8 @@ itself grants one-off access to that page). The in-panel reading buttons
 extension asks for permission to read page content (declared as an **optional**
 host permission, requested on demand, not at install). Manual paste and the
 right-click menu never need it. API keys are stored in `chrome.storage.local`;
-temporary selected text is passed through `chrome.storage.session`.
+temporary selected text is passed through `chrome.storage.session`. Budgetläge
+also makes direct calls to `api.search.brave.com` with your Brave Search key.
 
 ### Optional: pre-fill a key in dev
 
@@ -130,17 +151,19 @@ recommended flow is to ship keyless and let each user enter their own key.
 
 ## Privacy & security
 
-- Your API key is stored **only** in your browser's `localStorage` and is sent
-  **only** to the provider you selected. It never touches any other server -
-  there is no backend.
+- Your API keys are stored **only** in your browser's `localStorage` and are sent
+  **only** to the provider you selected and, in Budgetläge, to Brave Search.
+  They never touch any other server - there is no backend.
 - The text you submit is sent to that provider for analysis.
 - Clearing keys in the settings panel removes them from `localStorage`.
 
 ## Cost
 
-Each claim costs **one searched AI call**, plus one extract call per submission.
-Dense text with several claims means several searched calls. Gemini's free tier
-keeps casual use free; Anthropic is billed per token by your own org.
+Each submission costs one extract call. In Budgetläge, each claim costs one Brave
+Search request, but all claims are usually judged in one batch verifier call with
+the stronger verifier model. In Standard, each claim uses the selected provider's
+built-in web search, which can be more expensive but may be stronger for
+difficult checks.
 
 ## Limitations
 

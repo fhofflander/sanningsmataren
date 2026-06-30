@@ -1,18 +1,26 @@
 import type { Settings } from "../types";
+import { createBraveSearchProvider } from "../search/brave";
 import { createAnthropicProvider } from "./anthropic";
 import { createGeminiProvider } from "./gemini";
 import type { LLMProvider } from "./provider";
 
-export type { LLMProvider } from "./provider";
+export type { LLMProvider, ProgressReporter, ProgressUpdate } from "./provider";
 
 export function createProvider(settings: Settings): LLMProvider {
+  const searchProvider =
+    settings.costMode === "budget"
+      ? createBraveSearchProvider(settings.braveSearchKey.trim())
+      : undefined;
+
   if (settings.provider === "anthropic") {
     return createAnthropicProvider(settings.anthropicKey.trim(), {
       costMode: settings.costMode,
+      searchProvider,
     });
   }
   return createGeminiProvider(settings.geminiKey.trim(), {
     costMode: settings.costMode,
+    searchProvider,
   });
 }
 
