@@ -1,32 +1,44 @@
 # Sanningsmätaren
 
-A bring-your-own-key (BYOK) web app that fact-checks Swedish political claims.
-Paste in a quote, article, social post, or debate transcript; the app extracts
-the checkable factual claims and returns a sourced verdict for each, grounded in
-Swedish primary sources.
+Sanningsmätaren fact-checks Swedish political text. Paste or select a quote, an
+article, a social post, or a debate excerpt; the app extracts the checkable
+factual claims and returns a sourced verdict for each, grounded in Swedish
+primary sources.
+
+The project is moving to a **free-to-use, signed-in model**: instead of every
+user bringing their own API key, the app calls a backend that holds a single
+provider key, authenticates users with Google, applies a fair-use daily limit,
+and (with consent) logs questions and answers for quality review.
 
 > **Svenska:** Sanningsmätaren är ett verktyg för att faktagranska svensk
-> politik. Klistra in en text så plockar appen ut de kontrollerbara
-> faktapåståendena och ger varje påstående ett sourcat omdöme på en skala från
-> **FALSKT** till **SANT**. Appen har ingen backend - dina API-nycklar sparas
-> bara lokalt i din webbläsare.
+> politik. Klistra in eller markera en text så plockar appen ut de kontrollerbara
+> faktapåståendena och ger varje påstående ett källbelagt omdöme på en skala från
+> **FALSKT** till **SANT**. Tjänsten blir gratis att använda: du loggar in med
+> Google i stället för att ange en egen API-nyckel.
 
-There is **no backend and no server-side key**. The app is a purely static
-single-page app: every call to the AI provider is made directly from your
-browser using a key you supply. It can be deployed anywhere static (Vercel,
-Netlify, GitHub Pages).
+## Status
+
+This README describes the **target architecture**. The build-out is in progress:
+
+- **#9** Backend proxy (Python/FastAPI, EU region) that holds the company key
+- **#10** Google sign-in and per-user daily quota
+- **#11** Logging of questions and answers, gated by explicit consent (GDPR)
+
+Until those land, the repository still contains the original bring-your-own-key
+(BYOK) single-page app and Chrome extension, which is what runs today. The
+planning documents under [`docs/`](./docs) define the contracts the backend
+build follows. See [Project documents](#project-documents).
 
 ## How it works
 
-1. **extract(text)** - one AI call (no web search) pulls out up to 6 concrete,
-   checkable claims as JSON.
-2. **verify(claims)** - in **Budgetläge**, one Brave Search request per claim
-   gathers source snippets, then one batched AI call judges all claims together
-   without model-native web search. Budget verification uses the same stronger
-   verifier model as Standard, but avoids the provider's built-in search cost.
-   In **Standard**, the selected AI provider uses its built-in web search
-   directly per claim. Verdicts stream progressively in Standard; in Budgetläge
-   batch verdicts arrive together.
+1. **Extract:** one AI call (no web search) pulls up to 6 concrete, checkable
+   claims out of the submitted text as structured data.
+2. **Verify:** each claim is grounded against web search and given a verdict.
+   Swedish primary sources are prioritised. Two cost modes exist: a budget mode
+   that gathers search snippets and judges claims with a strong verifier model,
+   and a standard mode that uses the provider's built-in web search per claim. In
+   the target architecture both the provider key and this mode logic live on the
+   backend.
 
 ### Verdict scale
 
@@ -41,79 +53,65 @@ Netlify, GitHub Pages).
 
 ### Prioritized Swedish sources
 
-The verifier is instructed to prioritize Swedish primary sources -
+Verification is instructed to prioritise Swedish primary sources such as
 **riksdagen.se** (votes, motions, protocols), **scb.se** (statistics),
 **bra.se** (crime statistics), **konj.se**, **riksbank.se**,
-**riksrevisionen.se**, **migrationsverket.se**, **socialstyrelsen.se**,
-**folkhalsomyndigheten.se** - and to cross-check against established
-fact-checkers (Källkritikbyrån, SVT Verifierar).
+**riksrevisionen.se**, **migrationsverket.se**, **socialstyrelsen.se**, and
+**folkhalsomyndigheten.se**, and to cross-check against established fact-checkers
+(Källkritikbyrån, SVT Verifierar).
 
-## Providers (BYOK)
+## Architecture (target)
 
-You choose a provider in the in-app settings and paste your own key for it.
-The settings panel also has two cost modes:
-
-- **Budgetläge** (default): grounds verification through your own Brave Search
-  API key and uses the same stronger verifier model as Standard. This avoids the
-  expensive built-in web search tools in normal budget checks. Multiple claims
-  are judged in one batch call to reduce per-call overhead.
-- **Standard**: uses the standard verifier directly, matching the original
-  behavior with the AI provider's built-in web search.
-
-### Brave Search (budget search)
-
-Budgetläge requires a Brave Search API key in addition to your AI provider key.
-Get one at <https://api-dashboard.search.brave.com/app/keys> and paste it into
-the Brave field in settings. The key is stored locally and sent only to Brave
-Search.
-
-Brave Search requires its API key in an HTTP header and does not currently
-respond to normal browser CORS preflight requests. That means Brave Budgetläge
-is intended for the Chrome extension, where `host_permissions` allow the direct
-request. A plain hosted web app needs Standard mode or a small search proxy.
-
-### Google Gemini (free tier, default)
-
-1. Get a key at <https://aistudio.google.com/apikey>.
-2. Paste it into the app's settings. In Budgetläge, verification uses Brave
-   Search snippets. In Standard, verification uses Gemini's built-in
-   **Google Search grounding**.
-
-### Anthropic Claude
-
-1. Get a key at <https://console.anthropic.com/>.
-2. **Enable web search for your organization** in the Claude Console - the
-   Standard verify step relies on Anthropic's `web_search` server tool, which
-   must be enabled for your org or the call will fail. Budgetläge uses Brave
-   Search instead.
-3. Calls are made directly from the browser with the
-   `anthropic-dangerous-direct-browser-access: true` header.
-
-## Run locally
-
-```bash
-npm install
-npm run dev
+```
+Web SPA / Chrome extension
+        |
+        |  Google sign-in (chrome.identity)
+        |  Authorization: Bearer <google id_token>
+        v
+Backend  (Python / FastAPI, EU region: Fly.io or Cloud Run)
+        |   - verifies the user, enforces the daily quota
+        |   - holds the company provider key
+        |   - logs question + answer (consent-gated)
+        v
+AI / search providers (Gemini, Anthropic, Brave)
+        |
+   Postgres (users, consent, logs) + Redis (quota)   [EU region]
 ```
 
-Then open the dev URL, paste your keys into **Inställningar / API-nycklar**, and
-paste some text to check.
+The clients no longer call the AI providers directly and no longer hold any API
+key. They call the backend, which is the only remote endpoint. The extension's
+host permissions narrow to that one backend domain.
 
-## Run as a Chrome extension
+## Authentication and quota
 
-Build the unpacked extension:
+- **Sign-in:** Google, via `chrome.identity`, using only the non-sensitive
+  `openid email profile` scopes. See [`docs/extension-oauth-setup.md`](./docs/extension-oauth-setup.md).
+- **Quota:** each account has a daily limit on the number of checks, enforced on
+  the backend. Over the limit, the API returns `429` and the UI shows a
+  "daily limit reached" message.
 
-```bash
-npm run build:extension
-```
+## Privacy, data and GDPR
 
-Then open `chrome://extensions`, enable **Developer mode**, choose
-**Load unpacked**, and select `dist-extension/`.
+- Users no longer supply or store API keys. The company key stays on the server.
+- The text a user submits is sent to the chosen AI and search providers for
+  analysis.
+- Questions and answers are logged only after **explicit consent**. The text can
+  reveal political opinions, which is special category data under GDPR Article 9,
+  so consent is required and the processing is documented.
+- See [`docs/privacy-policy.md`](./docs/privacy-policy.md),
+  [`docs/gdpr-policy.md`](./docs/gdpr-policy.md), and the DPIA skeleton in
+  [`docs/dpia.md`](./docs/dpia.md). These are drafts pending legal review.
 
-After rebuilding, click **Reload** on the extension card in
-`chrome://extensions`. This is especially important after permission changes.
+## Clients
 
-The extension opens in Chrome's right-hand side panel and has four entry points:
+### Web SPA
+
+A React single-page app. In the target model it signs the user in and calls the
+backend; it holds no keys.
+
+### Chrome extension
+
+Opens in Chrome's right-hand side panel with four entry points:
 
 - click the Sanningsmätaren toolbar icon and paste text manually
 - click **Granska hela sidan** in the side panel to review the active page
@@ -122,63 +120,79 @@ The extension opens in Chrome's right-hand side panel and has four entry points:
   **Granska markerad text med Sanningsmätaren**
 
 The extension ships with **no** all-sites access and runs no always-on content
-script. The right-click menu works under the `activeTab` permission (the click
-itself grants one-off access to that page). The in-panel reading buttons
-(**Hämta markerad text** / **Granska hela sidan**) inject into the active tab via
-`chrome.scripting`, which needs page access - so the first time you use them the
-extension asks for permission to read page content (declared as an **optional**
-host permission, requested on demand, not at install). Manual paste and the
-right-click menu never need it. API keys are stored in `chrome.storage.local`;
-temporary selected text is passed through `chrome.storage.session`. Budgetläge
-also makes direct calls to `api.search.brave.com` with your Brave Search key.
+script. The right-click menu works under the `activeTab` permission. The in-panel
+reading buttons inject into the active tab via `chrome.scripting`, so the first
+time you use them the extension asks for page access, declared as an **optional**
+host permission requested on demand, not at install. Manual paste and the
+right-click menu never need it.
 
-### Optional: pre-fill a key in dev
-
-Copy `.env.example` to `.env.development.local` and add a key. The settings
-field is then pre-filled when you run `npm run dev`. This file is gitignored and
-is **only** loaded in dev mode - it is never inlined into a production build.
-
-## Deploy (static)
+## Local development
 
 ```bash
-npm run build   # outputs ./dist
+npm install
+npm run dev
 ```
 
-Deploy `dist/` to any static host (Vercel, Netlify, GitHub Pages). There is no
-server runtime. **Do not** build with a real key present in an env file if you
-intend to publish the build, since Vite inlines `VITE_*` variables - the
-recommended flow is to ship keyless and let each user enter their own key.
+The current dev build is still BYOK: open the dev URL, add a key under
+**Inställningar / API-nycklar**, and paste text to check. You can pre-fill a key
+by copying `.env.example` to `.env.development.local`. That file is gitignored and
+loaded **only** in dev mode; it is never inlined into a production build.
 
-## Privacy & security
+Build the unpacked extension:
 
-- Your API keys are stored **only** in your browser's `localStorage` and are sent
-  **only** to the provider you selected and, in Budgetläge, to Brave Search.
-  They never touch any other server - there is no backend.
-- The text you submit is sent to that provider for analysis.
-- Clearing keys in the settings panel removes them from `localStorage`.
+```bash
+npm run build:extension     # outputs ./dist-extension
+```
 
-## Cost
+Then open `chrome://extensions`, enable **Developer mode**, choose
+**Load unpacked**, and select `dist-extension/`. Click **Reload** on the
+extension card after each rebuild, especially after permission changes.
 
-Each submission costs one extract call. In Budgetläge, each claim costs one Brave
-Search request, but all claims are usually judged in one batch verifier call with
-the stronger verifier model. In Standard, each claim uses the selected provider's
-built-in web search, which can be more expensive but may be stronger for
-difficult checks.
+Regenerate the extension icons after editing `extension/icon.svg`:
+
+```bash
+npm run icons
+```
+
+## Deploy
+
+- **Backend:** container on Fly.io or Cloud Run, in an EU region for data
+  residency, with the provider key set as a server-only secret. See
+  [`docs/backend-api-contract.md`](./docs/backend-api-contract.md) and
+  [`docs/db-schema.md`](./docs/db-schema.md).
+- **Web SPA:** `npm run build` outputs `./dist`, deployable to any static host.
+- **Extension:** packaged from `dist-extension/` and published to the Chrome Web
+  Store. Listing assets live in [`store-assets/`](./store-assets).
+
+## Stack
+
+- **Frontend:** Vite, React, TypeScript, Tailwind CSS.
+- **Backend (target):** Python 3.12, FastAPI.
+- **Data (target):** Postgres and Redis, EU region.
+- **Auth (target):** Google sign-in via `chrome.identity`.
+
+## Project documents
+
+| Document | What |
+| --- | --- |
+| [`docs/backend-api-contract.md`](./docs/backend-api-contract.md) | Client/backend API contract |
+| [`docs/db-schema.md`](./docs/db-schema.md) | Database schema proposal |
+| [`docs/extension-oauth-setup.md`](./docs/extension-oauth-setup.md) | Extension ID and Google OAuth setup |
+| [`docs/login-consent-copy.md`](./docs/login-consent-copy.md) | Swedish login and consent UI copy |
+| [`docs/privacy-policy.md`](./docs/privacy-policy.md) | User-facing privacy policy (draft) |
+| [`docs/gdpr-policy.md`](./docs/gdpr-policy.md) | Internal data protection policy (draft) |
+| [`docs/dpia.md`](./docs/dpia.md) | DPIA skeleton (draft) |
+| [`store-assets/store-listing.md`](./store-assets/store-listing.md) | Chrome Web Store listing copy and assets |
 
 ## Limitations
 
 - Verdicts are **automated and not authoritative**. Always click through to the
   sources and judge for yourself.
-- Works best with the politician's **exact words** - paraphrasing reduces
-  accuracy.
-- Live audio capture and transcription are explicitly **out of scope** for this
-  app. It works only on text you paste, select, or load from a page - the Chrome
-  extension reads page/selection text, it does not record or transcribe audio.
-
-## Stack
-
-Vite + React + TypeScript + Tailwind CSS. Pure client-side SPA, no backend.
+- Works best with the politician's **exact words**. Paraphrasing reduces accuracy.
+- Live audio capture and transcription are explicitly **out of scope**. The app
+  works only on text you paste, select, or load from a page. The Chrome extension
+  reads page and selection text; it does not record or transcribe audio.
 
 ## License
 
-MIT - see [LICENSE](./LICENSE).
+MIT. See [LICENSE](./LICENSE).
