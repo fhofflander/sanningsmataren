@@ -3,3 +3,4 @@
 // memory by upgradeTimeline (see App.tsx).
 
 export * from "../../format/src/types";
+export * from "../../format/src/indexDoc";

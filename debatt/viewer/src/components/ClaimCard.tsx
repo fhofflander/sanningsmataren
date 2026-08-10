@@ -3,7 +3,16 @@
 import type { TimelineEvent } from "../types";
 import { formatTime, partyColor, VERDICT_COLOR, VERDICT_SYMBOL } from "../verdict";
 
-export function ClaimCard({ event, live }: { event: TimelineEvent | null; live: boolean }) {
+export function ClaimCard({
+  event,
+  live,
+  granskare = [],
+}: {
+  event: TimelineEvent | null;
+  live: boolean;
+  /** Resolved fact-checker names for event.granskadAv. */
+  granskare?: string[];
+}) {
   if (!event) {
     return (
       <div className="claim-card claim-card-empty">
@@ -32,6 +41,9 @@ export function ClaimCard({ event, live }: { event: TimelineEvent | null; live: 
           </span>
         )}
       </div>
+      {granskare.length > 0 && (
+        <p className="claim-byline">Faktagranskad av {granskare.join(", ")}</p>
+      )}
       <p className="claim-motivering">{event.motivering}</p>
       {event.osakerhet && <p className="claim-osakerhet">Osäkerhet: {event.osakerhet}</p>}
       {event.kallor.length > 0 && (

@@ -1,6 +1,6 @@
-// Playback clock. Driven by the <video> element when a video file is loaded,
-// otherwise by an internal timer (demo mode) so a timeline can be reviewed
-// without the broadcast file.
+// Playback clock. Driven by the <video> element when a video source exists
+// (hosted URL or locally loaded file), otherwise by an internal timer so a
+// timeline can be reviewed without the broadcast file.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -15,9 +15,10 @@ export interface Playback {
   seek: (t: number) => void;
 }
 
-export function usePlayback(durationSec: number): Playback {
+export function usePlayback(durationSec: number, remoteVideoUrl?: string | null): Playback {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const videoUrl = localUrl ?? remoteVideoUrl ?? null;
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const timeRef = useRef(0);
@@ -44,14 +45,15 @@ export function usePlayback(durationSec: number): Playback {
     return () => cancelAnimationFrame(raf);
   }, [videoUrl, playing, durationSec]);
 
+  // Only locally created object URLs are ours to revoke.
   useEffect(() => {
     return () => {
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
+      if (localUrl) URL.revokeObjectURL(localUrl);
     };
-  }, [videoUrl]);
+  }, [localUrl]);
 
   const loadVideoFile = useCallback((file: File) => {
-    setVideoUrl((old) => {
+    setLocalUrl((old) => {
       if (old) URL.revokeObjectURL(old);
       return URL.createObjectURL(file);
     });

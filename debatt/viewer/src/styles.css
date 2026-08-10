@@ -379,3 +379,164 @@ body {
   border-radius: 8px;
   padding: 8px 12px;
 }
+
+/* Shell navigation */
+.brand-link {
+  color: inherit;
+  text-decoration: none;
+}
+.header-nav a {
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+.header-nav a:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.debate-title h2 {
+  margin: 0 0 14px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Debate index */
+.index-intro {
+  color: var(--muted);
+  margin: 4px 0 18px;
+  max-width: 640px;
+}
+.debate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.debate-card {
+  display: block;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+.debate-card:hover {
+  border-color: var(--accent);
+}
+.debate-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.video-badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+}
+.debate-card-titel {
+  font-size: 15px;
+  margin: 8px 0;
+  line-height: 1.35;
+}
+.debate-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.debate-card-partier {
+  display: inline-flex;
+  gap: 4px;
+}
+.verdict-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  gap: 1px;
+}
+.verdict-bar-seg {
+  display: block;
+  flex-basis: 0;
+}
+
+/* Claim byline */
+.claim-byline {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Footer: redaktion + changelog */
+.redaktion p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.andringslogg {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.andringslogg summary {
+  cursor: pointer;
+}
+.andringslogg ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.andringslogg-datum {
+  font-variant-numeric: tabular-nums;
+}
+.andringslogg-typ {
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Local preview tool */
+.granska-panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.granska-panel p {
+  margin-top: 0;
+}
+.granska-findings {
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.granska-findings ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.granska-errors {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+.granska-warnings {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}

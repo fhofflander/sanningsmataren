@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "debates": [
+    {
+      "id": "exempeldebatt-demo",
+      "titel": "Exempeldebatt (fiktiv demodata - inga verkliga personer eller uttalanden)",
+      "datum": "2026-01-01",
+      "partier": ["S", "M", "SD", "C"],
+      "antalPastaenden": 8,
+      "perOmdome": {
+        "SANT": 2,
+        "MESTADELS SANT": 2,
+        "VILSELEDANDE": 1,
+        "MESTADELS FALSKT": 1,
+        "FALSKT": 1,
+        "GÅR EJ ATT AVGÖRA": 1
+      },
+      "videoMode": "ingen",
+      "timelineUrl": "sample-timeline.json",
+      "publiceradAt": "2026-01-01T00:00:00Z",
+      "demo": true
+    }
+  ]
+}
