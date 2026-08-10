@@ -182,16 +182,31 @@ npm run icons
 | [`docs/privacy-policy.md`](./docs/privacy-policy.md) | User-facing privacy policy (draft) |
 | [`docs/gdpr-policy.md`](./docs/gdpr-policy.md) | Internal data protection policy (draft) |
 | [`docs/dpia.md`](./docs/dpia.md) | DPIA skeleton (draft) |
+| [`docs/debatt-arkitektur.md`](./docs/debatt-arkitektur.md) | Debate-analysis module architecture (draft) |
+| [`docs/debatt-format.md`](./docs/debatt-format.md) | Debate-analysis file formats (draft) |
+| [`docs/debatt-dpia-addendum.md`](./docs/debatt-dpia-addendum.md) | Debate-analysis DPIA addendum (draft) |
 | [`store-assets/store-listing.md`](./store-assets/store-listing.md) | Chrome Web Store listing copy and assets |
+
+## Debattanalys module (experimental)
+
+A standalone sibling module under `debatt/` (in planning/build-out) transcribes
+recorded Swedish political debates, runs the statements through the same
+extract-and-verify logic, and produces a timeline file a viewer can play back
+with a flowing truth gauge and sourced verdicts. It shares the domain contract
+(verdict scale, claim shapes) with the main app but no code, and nothing in it
+affects the extension or the planned backend. See
+[`docs/debatt-arkitektur.md`](./docs/debatt-arkitektur.md).
 
 ## Limitations
 
 - Verdicts are **automated and not authoritative**. Always click through to the
   sources and judge for yourself.
 - Works best with the politician's **exact words**. Paraphrasing reduces accuracy.
-- Live audio capture and transcription are explicitly **out of scope**. The app
-  works only on text you paste, select, or load from a page. The Chrome extension
-  reads page and selection text; it does not record or transcribe audio.
+- Live audio capture and transcription are explicitly **out of scope for the
+  clients**. The app works only on text you paste, select, or load from a page.
+  The Chrome extension reads page and selection text; it does not record or
+  transcribe audio. (The separate Debattanalys module processes recorded
+  broadcasts offline; it is not part of the extension or SPA.)
 
 ## License
 
