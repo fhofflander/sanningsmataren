@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "debate": {
+    "id": "exempeldebatt-demo",
+    "titel": "Exempeldebatt (fiktiv demodata - inga verkliga personer eller uttalanden)",
+    "datum": "2026-01-01",
+    "sourceUrl": "",
+    "durationSec": 600.0,
+    "deltagare": [
+      { "namn": "Anna Andersson", "parti": "S", "roll": "partiledare" },
+      { "namn": "Bertil Berg", "parti": "M", "roll": "partiledare" },
+      { "namn": "Cecilia Ceder", "parti": "SD", "roll": "partiledare" },
+      { "namn": "David Dahl", "parti": "C", "roll": "partiledare" }
+    ]
+  },
+  "events": [
+    {
+      "id": "c0001",
+      "start": 30.0,
+      "end": 42.0,
+      "talare": "Anna Andersson",
+      "parti": "S",
+      "citat": "arbetslösheten har sjunkit två kvartal i rad",
+      "pastaende": "Arbetslösheten i Sverige har sjunkit två kvartal i rad.",
+      "typ": "statistik",
+      "omdome": "MESTADELS SANT",
+      "gauge": 75,
+      "motivering": "Fiktiv motivering: siffran stämmer i säsongsrensade data men är inom felmarginalen.",
+      "kallor": [{ "titel": "SCB (exempel)", "url": "https://www.scb.se" }],
+      "osakerhet": "",
+      "granskad": false
+    },
+    {
+      "id": "c0002",
+      "start": 75.0,
+      "end": 90.0,
+      "talare": "Bertil Berg",
+      "parti": "M",
+      "citat": "riksdagen röstade nej till förslaget i våras",
+      "pastaende": "Riksdagen röstade nej till det aktuella förslaget våren 2025.",
+      "typ": "omröstning",
+      "omdome": "SANT",
+      "gauge": 100,
+      "motivering": "Fiktiv motivering: voteringsprotokollet bekräftar uppgiften.",
+      "kallor": [{ "titel": "Riksdagen (exempel)", "url": "https://www.riksdagen.se" }],
+      "osakerhet": "",
+      "granskad": false
+    },
+    {
+      "id": "c0003",
+      "start": 130.0,
+      "end": 142.0,
+      "talare": "Cecilia Ceder",
+      "parti": "SD",
+      "citat": "kostnaderna har exploderat",
+      "pastaende": "Kostnaderna på området har ökat kraftigt de senaste åren.",
+      "typ": "statistik",
+      "omdome": "VILSELEDANDE",
+      "gauge": 50,
+      "motivering": "Fiktiv motivering: nominell ökning, men realt och per capita är ökningen liten.",
+      "kallor": [{ "titel": "Ekonomistyrningsverket (exempel)", "url": "https://www.esv.se" }],
+      "osakerhet": "",
+      "granskad": true
+    },
+    {
+      "id": "c0004",
+      "start": 190.0,
+      "end": 205.0,
+      "talare": "Anna Andersson",
+      "parti": "S",
+      "citat": "vi har aldrig haft fler poliser än nu",
+      "pastaende": "Sverige har fler poliser nu än någonsin tidigare.",
+      "typ": "historiskt",
+      "omdome": "FALSKT",
+      "gauge": 0,
+      "motivering": "Fiktiv motivering: per capita var antalet högre under en tidigare period.",
+      "kallor": [{ "titel": "Polisen (exempel)", "url": "https://polisen.se" }],
+      "osakerhet": "",
+      "granskad": true
+    },
+    {
+      "id": "c0005",
+      "start": 250.0,
+      "end": 260.0,
+      "talare": "David Dahl",
+      "parti": "C",
+      "citat": "elpriserna var högst i södra Sverige i fjol",
+      "pastaende": "Elpriserna var högst i elområde 4 under förra året.",
+      "typ": "statistik",
+      "omdome": "SANT",
+      "gauge": 100,
+      "motivering": "Fiktiv motivering: prisstatistiken bekräftar uppgiften.",
+      "kallor": [{ "titel": "Energimyndigheten (exempel)", "url": "https://www.energimyndigheten.se" }],
+      "osakerhet": "",
+      "granskad": false
+    },
+    {
+      "id": "c0006",
+      "start": 310.0,
+      "end": 330.0,
+      "talare": "Bertil Berg",
+      "parti": "M",
+      "citat": "vartannat företag överväger att lämna landet",
+      "pastaende": "Ungefär hälften av företagen överväger att flytta verksamhet utomlands.",
+      "typ": "statistik",
+      "omdome": "MESTADELS FALSKT",
+      "gauge": 25,
+      "motivering": "Fiktiv motivering: undersökningen gällde en liten bransch och en mildare fråga.",
+      "kallor": [{ "titel": "Branschenkät (exempel)", "url": "https://www.example.se" }],
+      "osakerhet": "Fiktiv osäkerhet: enkätens urval är oklart.",
+      "granskad": true
+    },
+    {
+      "id": "c0007",
+      "start": 380.0,
+      "end": 395.0,
+      "talare": "Cecilia Ceder",
+      "parti": "SD",
+      "citat": "det där har er politik orsakat",
+      "pastaende": "Motståndarens politik orsakade den beskrivna utvecklingen.",
+      "typ": "orsakssamband",
+      "omdome": "GÅR EJ ATT AVGÖRA",
+      "gauge": 50,
+      "motivering": "Fiktiv motivering: orsakssambandet kan inte beläggas med tillgängliga källor.",
+      "kallor": [],
+      "osakerhet": "Orsakssamband i komplexa system är svåra att fastslå.",
+      "granskad": false
+    },
+    {
+      "id": "c0008",
+      "start": 450.0,
+      "end": 470.0,
+      "talare": "Anna Andersson",
+      "parti": "S",
+      "citat": "vi satsar tre miljarder mer än förra året",
+      "pastaende": "Anslaget ökar med tre miljarder kronor jämfört med föregående år.",
+      "typ": "statistik",
+      "omdome": "MESTADELS SANT",
+      "gauge": 75,
+      "motivering": "Fiktiv motivering: beloppet stämmer nominellt; realt är ökningen mindre.",
+      "kallor": [{ "titel": "Budgetproposition (exempel)", "url": "https://www.regeringen.se" }],
+      "osakerhet": "",
+      "granskad": false
+    }
+  ],
+  "series": {
+    "perParti": {
+      "S": [
+        { "t": 42.0, "rullande": 75.0, "kumulativ": 75.0, "antal": 1 },
+        { "t": 205.0, "rullande": 37.5, "kumulativ": 37.5, "antal": 2 },
+        { "t": 470.0, "rullande": 50.0, "kumulativ": 50.0, "antal": 3 }
+      ],
+      "M": [
+        { "t": 90.0, "rullande": 100.0, "kumulativ": 100.0, "antal": 1 },
+        { "t": 330.0, "rullande": 62.5, "kumulativ": 62.5, "antal": 2 }
+      ],
+      "SD": [{ "t": 142.0, "rullande": 50.0, "kumulativ": 50.0, "antal": 1 }],
+      "C": [{ "t": 260.0, "rullande": 100.0, "kumulativ": 100.0, "antal": 1 }]
+    },
+    "perTalare": {
+      "Anna Andersson": [
+        { "t": 42.0, "rullande": 75.0, "kumulativ": 75.0, "antal": 1 },
+        { "t": 205.0, "rullande": 37.5, "kumulativ": 37.5, "antal": 2 },
+        { "t": 470.0, "rullande": 50.0, "kumulativ": 50.0, "antal": 3 }
+      ],
+      "Bertil Berg": [
+        { "t": 90.0, "rullande": 100.0, "kumulativ": 100.0, "antal": 1 },
+        { "t": 330.0, "rullande": 62.5, "kumulativ": 62.5, "antal": 2 }
+      ],
+      "Cecilia Ceder": [{ "t": 142.0, "rullande": 50.0, "kumulativ": 50.0, "antal": 1 }],
+      "David Dahl": [{ "t": 260.0, "rullande": 100.0, "kumulativ": 100.0, "antal": 1 }]
+    }
+  },
+  "stats": {
+    "antalPastaenden": 8,
+    "perOmdome": {
+      "SANT": 2,
+      "MESTADELS SANT": 2,
+      "VILSELEDANDE": 1,
+      "MESTADELS FALSKT": 1,
+      "FALSKT": 1,
+      "GÅR EJ ATT AVGÖRA": 1
+    },
+    "perParti": {
+      "S": { "antal": 3, "kumulativ": 50.0, "perOmdome": { "MESTADELS SANT": 2, "FALSKT": 1 } },
+      "M": { "antal": 2, "kumulativ": 62.5, "perOmdome": { "SANT": 1, "MESTADELS FALSKT": 1 } },
+      "SD": { "antal": 2, "kumulativ": 50.0, "perOmdome": { "VILSELEDANDE": 1, "GÅR EJ ATT AVGÖRA": 1 } },
+      "C": { "antal": 1, "kumulativ": 100.0, "perOmdome": { "SANT": 1 } }
+    }
+  },
+  "sammanfattning": "Detta är fiktiv demodata för att visa gränssnittet. Personerna, uttalandena, omdömena och källorna är påhittade och representerar inte verkliga händelser eller partier. Ladda en riktig timeline.json från pipelinen för att se en verklig debatt.",
+  "disclaimer": "Omdömena är automatiskt genererade och inte auktoritativa. Granska källorna och bedöm själv.",
+  "generatedAt": "2026-01-01T00:00:00Z"
+}
