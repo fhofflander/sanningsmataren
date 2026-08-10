@@ -35,12 +35,29 @@ debatt ingest "https://www.svtplay.se/video/..." --id svt-partiledardebatt-2026-
 debatt transcribe svt-partiledardebatt-2026-06-07
 ```
 
-Artifacts land in `debatt/data/<id>/` (gitignored): `video.*`, `audio.wav`,
-`meta.json`, `azure-raw.json`, `transcript.json`. Every stage is re-runnable
-in isolation.
+```bash
+# 4. Analysis: extract claims (Haiku), verify each with web search (Sonnet),
+#    adversarially review every harsh verdict, build timeline.json
+debatt analyze svt-partiledardebatt-2026-06-07
+# ... or stage by stage:
+debatt extract  svt-partiledardebatt-2026-06-07
+debatt verify   svt-partiledardebatt-2026-06-07   # --skip-review to skip the devil's-advocate pass
+debatt assemble svt-partiledardebatt-2026-06-07   # --skip-summary to skip the AI summary
+```
 
-Phase 2 adds `debatt extract`, `debatt verify` and `debatt assemble`
-(claims, verdicts and the publishable `timeline.json`).
+Artifacts land in `debatt/data/<id>/` (gitignored): `video.*`, `audio.wav`,
+`meta.json`, `azure-raw.json`, `transcript.json`, `claims.json`,
+`verdicts.json` and the publishable `timeline.json` (the only file the viewer
+needs). Every stage is re-runnable in isolation.
+
+Verification notes:
+
+- Uses the same verdict scale, misleading-guidance rubric and prioritized
+  Swedish sources as the main app; three concurrent calls like the extension.
+- Every `FALSKT` / `MESTADELS FALSKT` / `VILSELEDANDE` verdict is re-examined
+  by an adversarial reviewer instructed to refute it. The review can only
+  confirm, soften, or set `GÅR EJ ATT AVGÖRA` - never harshen (enforced in
+  code). Failed verifications become `GÅR EJ ATT AVGÖRA`, never guesses.
 
 ## Limits
 

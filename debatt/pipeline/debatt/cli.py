@@ -46,6 +46,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_common(p_transcribe)
 
+    p_extract = sub.add_parser("extract", help="Extrahera kontrollerbara påståenden")
+    p_extract.add_argument("debate_id", help="Debatt-id")
+    _add_common(p_extract)
+
+    p_verify = sub.add_parser(
+        "verify", help="Verifiera påståenden med webbsökning + adversarial granskning"
+    )
+    p_verify.add_argument("debate_id", help="Debatt-id")
+    p_verify.add_argument(
+        "--skip-review", action="store_true", help="Hoppa över adversarial granskning"
+    )
+    _add_common(p_verify)
+
+    p_assemble = sub.add_parser("assemble", help="Bygg publicerbar timeline.json")
+    p_assemble.add_argument("debate_id", help="Debatt-id")
+    p_assemble.add_argument(
+        "--skip-summary", action="store_true", help="Hoppa över AI-sammanfattning"
+    )
+    _add_common(p_assemble)
+
+    p_analyze = sub.add_parser(
+        "analyze", help="Kör extract + verify + assemble i följd"
+    )
+    p_analyze.add_argument("debate_id", help="Debatt-id")
+    p_analyze.add_argument("--skip-review", action="store_true")
+    p_analyze.add_argument("--skip-summary", action="store_true")
+    _add_common(p_analyze)
+
     return parser
 
 
@@ -73,6 +101,26 @@ def main(argv: list[str] | None = None) -> int:
                 max_speakers=args.max_speakers,
                 skip_mapping=args.skip_mapping,
             )
+        elif args.command == "extract":
+            from debatt.extract import extract
+
+            extract(args.debate_id, config)
+        elif args.command == "verify":
+            from debatt.verify import verify
+
+            verify(args.debate_id, config, skip_review=args.skip_review)
+        elif args.command == "assemble":
+            from debatt.assemble import assemble
+
+            assemble(args.debate_id, config, skip_summary=args.skip_summary)
+        elif args.command == "analyze":
+            from debatt.assemble import assemble
+            from debatt.extract import extract
+            from debatt.verify import verify
+
+            extract(args.debate_id, config)
+            verify(args.debate_id, config, skip_review=args.skip_review)
+            assemble(args.debate_id, config, skip_summary=args.skip_summary)
     except Exception as exc:  # surfaced as a clean CLI error, not a traceback
         print(f"FEL: {exc}", file=sys.stderr)
         return 1
