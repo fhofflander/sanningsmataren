@@ -5,7 +5,7 @@ import { PartyCurves } from "./components/PartyCurves";
 import { StatsPanel } from "./components/StatsPanel";
 import { TruthGauge } from "./components/TruthGauge";
 import type { Timeline } from "./types";
-import { SUPPORTED_TIMELINE_VERSION } from "./types";
+import { upgradeTimeline } from "../../format/src/upgrade";
 import { usePlayback } from "./usePlayback";
 import { formatTime } from "./verdict";
 
@@ -14,12 +14,14 @@ async function fetchTimeline(): Promise<{ timeline: Timeline; demo: boolean }> {
     ["./timeline.json", false],
     ["./sample-timeline.json", true],
   ] as const) {
+    let res: Response;
     try {
-      const res = await fetch(path);
-      if (res.ok) return { timeline: (await res.json()) as Timeline, demo };
+      res = await fetch(path);
     } catch {
-      // try the next candidate
+      continue; // try the next candidate
     }
+    if (!res.ok) continue;
+    return { timeline: upgradeTimeline(await res.json()), demo };
   }
   throw new Error("Hittade varken timeline.json eller sample-timeline.json.");
 }
@@ -32,14 +34,10 @@ export default function App() {
   useEffect(() => {
     fetchTimeline()
       .then(({ timeline, demo }) => {
-        if (timeline.version !== SUPPORTED_TIMELINE_VERSION) {
-          setError(`Okänd timeline-version: ${timeline.version}`);
-        } else {
-          setTimeline(timeline);
-          setIsDemo(demo);
-        }
+        setTimeline(timeline);
+        setIsDemo(demo);
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
 
   const duration = useMemo(() => {
@@ -64,15 +62,15 @@ export default function App() {
 
   const loadTimelineFile = (file: File) => {
     void file.text().then((text) => {
-      const parsed = JSON.parse(text) as Timeline;
-      if (parsed.version !== SUPPORTED_TIMELINE_VERSION) {
-        setError(`Okänd timeline-version: ${parsed.version}`);
-        return;
+      try {
+        const parsed = upgradeTimeline(JSON.parse(text));
+        setError(null);
+        setTimeline(parsed);
+        setIsDemo(false);
+        playback.seek(0);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
       }
-      setError(null);
-      setTimeline(parsed);
-      setIsDemo(false);
-      playback.seek(0);
     });
   };
 
@@ -128,11 +126,11 @@ export default function App() {
           ) : (
             <div className="video-placeholder">
               <p>
-                Ingen videofil laddad. Videon återpubliceras inte här - se debatten hos källan
-                {timeline.debate.sourceUrl && (
+                Ingen videofil laddad. Se debatten hos källan
+                {timeline.debate.video.externUrl && (
                   <>
                     {" "}
-                    (<a href={timeline.debate.sourceUrl} target="_blank" rel="noopener noreferrer">öppna källan</a>)
+                    (<a href={timeline.debate.video.externUrl} target="_blank" rel="noopener noreferrer">öppna källan</a>)
                   </>
                 )}{" "}
                 eller ladda en lokal videofil ovan.

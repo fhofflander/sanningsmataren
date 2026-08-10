@@ -1,0 +1,18 @@
+{
+  "name": "debatt-format",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared format types, validation and deterministic compilation for the debatt module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.3",
+    "vitest": "^2.1.9"
+  }
+}

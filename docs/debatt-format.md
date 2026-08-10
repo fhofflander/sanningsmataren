@@ -231,6 +231,96 @@ Rules:
   - Statements by unmapped speakers (`parti: null`) never enter `perParti`.
 - `disclaimer` is mandatory and the viewer must display it.
 
+## 5b. `timeline.json` version 2 - manually fact-checked debates (2026-08-10)
+
+Version 2 extends version 1 for the admin flow where the editors compile
+fact-checks manually (see `granskning.json` below) and the app hosts the
+video itself. The viewer accepts both versions: v1 files are upgraded in
+memory by `debatt/format/src/upgrade.ts` with `ursprung: "ai"`,
+`granskadAv: []` and `video` derived from `sourceUrl`.
+
+New or changed relative to v1:
+
+- `debate.video` replaces `debate.sourceUrl`:
+  `{ "mode": "hosted" | "extern" | "ingen", "url": ..., "externUrl": ...,
+  "rattighetsgrund": ..., "notering"? }`. `url` is the public playback URL,
+  set by the publish step and only for `hosted`; `hosted` requires a recorded
+  `rattighetsgrund` (e.g. `egen-inspelning`, `avtal`, `licens`); `extern`
+  requires `externUrl` (link to the official player).
+- `redaktion`: `{ "organisation", "kontakt", "faktagranskare":
+  [{ "id", "namn", "roll"?, "profilUrl"? }] }` or `null` for upgraded v1
+  files. This is the public contact point the DPIA correction routine
+  requires.
+- `events[].ursprung`: `"manuell" | "ai" | "hybrid"` - how the verdict was
+  produced.
+- `events[].granskadAv`: array of `faktagranskare` ids. `granskad` now means
+  "reviewed" regardless of method: the AI adversarial pass in v1, at least
+  one named granskare in the manual flow.
+- `andringslogg`: `[{ "datum", "typ": "publicering" | "rattelse" |
+  "fortydligande", "beskrivning", "eventId"? }]` - the published changelog,
+  at minimum the initial publish entry.
+- `disclaimer` is per debate. The compiler supplies a default matching the
+  events' `ursprung`; the v1 wording ("automatiskt genererade") is wrong for
+  manual verdicts and must not be reused for them.
+
+`gauge`, `series` and `stats` are computed, never authored. The rules in §5
+are unchanged and implemented in `debatt/format/src/compile.ts`, a
+TypeScript port of `debatt/pipeline/debatt/timeline.py`; the test vectors in
+`debatt/format/tests/compile.test.ts` mirror
+`debatt/pipeline/tests/test_timeline.py` to keep the two in sync (including
+Python's round-half-to-even).
+
+## 5c. `granskning.json` - the manually authored input
+
+Authored by the editors outside the app, validated by `validateGranskning`
+and compiled to timeline v2 by `compileTimeline` (both in `debatt/format`).
+Contains no computed fields.
+
+```json
+{
+  "formatVersion": 1,
+  "debate": {
+    "id": "svt-partiledardebatt-2026-10-04",
+    "titel": "Partiledardebatt i SVT Agenda",
+    "datum": "2026-10-04",
+    "durationSec": 5400.0,
+    "deltagare": [{ "namn": "Anna Andersson", "parti": "S", "roll": "partiledare" }],
+    "video": { "mode": "hosted", "rattighetsgrund": "egen-inspelning" }
+  },
+  "redaktion": {
+    "organisation": "Sanningsmätaren",
+    "kontakt": "redaktionen@example.se",
+    "faktagranskare": [{ "id": "jp", "namn": "Jonathan Persson" }]
+  },
+  "events": [
+    {
+      "id": "e0001",
+      "start": 130.1,
+      "end": 141.9,
+      "talare": "Anna Andersson",
+      "citat": "arbetslösheten har ökat tre år i rad",
+      "pastaende": "Arbetslösheten i Sverige har ökat tre år i rad.",
+      "typ": "statistik",
+      "omdome": "MESTADELS SANT",
+      "motivering": "...",
+      "kallor": [{ "titel": "...", "url": "https://..." }],
+      "granskadAv": ["jp"]
+    }
+  ],
+  "sammanfattning": "..."
+}
+```
+
+Validation rules (errors block compilation): `end > start` and within
+`durationSec`; unique event ids (generated `e0001`... when omitted);
+conclusive verdicts require at least one källa; `FALSKT`,
+`MESTADELS FALSKT` and `VILSELEDANDE` additionally require a motivering
+(the manual counterpart of the v1 adversarial-review gate); manual events
+require at least one `granskadAv` id resolving to
+`redaktion.faktagranskare`; `hosted` requires `rattighetsgrund`, `extern`
+requires `externUrl`. `parti` is auto-filled from `deltagare` by `talare`
+when omitted; unknown speakers and party codes are warnings, not errors.
+
 ## 6. Later: database sketch (not built in the MVP)
 
 If/when the module outgrows files, the natural tables are `debates` (meta),
@@ -244,3 +334,9 @@ different things for different legal bases.
 Every artifact carries `version` (integer). Breaking format changes bump the
 version and are recorded here. The viewer refuses timeline versions it does
 not know.
+
+- timeline v2 (2026-08-10): manual fact-checking (redaktion, granskadAv,
+  ursprung), self-hosted video reference with rights basis, ändringslogg.
+  The viewer upgrades v1 files in memory; versions above 2 are refused.
+- granskning v1 (2026-08-10): new manually authored input format, compiled
+  to timeline v2 by `debatt/format`.
