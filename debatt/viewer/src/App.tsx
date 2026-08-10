@@ -2,6 +2,7 @@
 // components/DebateView.tsx; data loading in lib/data.ts.
 
 import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { AdminPage } from "./routes/admin/AdminPage";
 import { DebatePage } from "./routes/DebatePage";
 import { GranskaPage } from "./routes/GranskaPage";
 import { IndexPage } from "./routes/IndexPage";
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/" element={<IndexPage />} />
         <Route path="/debatt/:id" element={<DebatePage />} />
         <Route path="/granska" element={<GranskaPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
