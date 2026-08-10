@@ -16,7 +16,8 @@ export function ClaimCard({
   if (!event) {
     return (
       <div className="claim-card claim-card-empty">
-        Inga granskade påståenden ännu vid den här tidpunkten.
+        Inget påstående har granskats vid den här tidpunkten. Tryck play eller hoppa i
+        tidslinjen.
       </div>
     );
   }
@@ -37,7 +38,7 @@ export function ClaimCard({
         </span>
         {event.granskad && (
           <span className="reviewed-chip" title="Omdömet har genomgått en extra kritisk granskning">
-            granskad
+            extra granskad
           </span>
         )}
       </div>
@@ -47,15 +48,18 @@ export function ClaimCard({
       <p className="claim-motivering">{event.motivering}</p>
       {event.osakerhet && <p className="claim-osakerhet">Osäkerhet: {event.osakerhet}</p>}
       {event.kallor.length > 0 && (
-        <ul className="claim-sources">
-          {event.kallor.map((k) => (
-            <li key={k.url}>
-              <a href={k.url} target="_blank" rel="noopener noreferrer">
-                {k.titel || k.url}
-              </a>
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="claim-sources-label">Källor</p>
+          <ul className="claim-sources">
+            {event.kallor.map((k) => (
+              <li key={k.url}>
+                <a href={k.url} target="_blank" rel="noopener noreferrer">
+                  {k.titel || k.url}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

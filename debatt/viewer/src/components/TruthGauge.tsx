@@ -24,19 +24,29 @@ export function TruthGauge({ event }: { event: TimelineEvent | null }) {
   const value = event ? event.gauge : 50;
   const needleAngle = -90 + (value / 100) * 180;
   const color = event ? VERDICT_COLOR[event.omdome] : "#9ca3af";
+  const isActive = (s: (typeof SEGMENTS)[number]) =>
+    Boolean(event) && value >= s.from && (value < s.to || (value === 100 && s.to === 100));
 
   return (
     <div className="gauge" role="img" aria-label={event ? `Omdöme: ${event.omdome}` : "Ingen aktiv granskning"}>
       <svg viewBox="0 0 200 118" className="gauge-svg">
+        <path
+          d={arcPath(0, 100, 84, 100, 104)}
+          stroke="#e8ede9"
+          strokeWidth={14}
+          strokeLinecap="round"
+          fill="none"
+        />
         {SEGMENTS.map((s) => (
           <path
             key={s.from}
             d={arcPath(s.from + 1, s.to - 1, 84, 100, 104)}
             stroke={s.color}
-            strokeWidth={14}
+            strokeWidth={isActive(s) ? 16 : 14}
             strokeLinecap="round"
             fill="none"
-            opacity={0.35}
+            opacity={isActive(s) ? 1 : 0.28}
+            style={{ transition: "opacity 400ms ease" }}
           />
         ))}
         <g
@@ -46,15 +56,21 @@ export function TruthGauge({ event }: { event: TimelineEvent | null }) {
             transition: "transform 700ms cubic-bezier(.22,1,.36,1)",
           }}
         >
-          <line x1={100} y1={104} x2={100} y2={34} stroke="#111827" strokeWidth={3.5} strokeLinecap="round" />
+          <path d="M 97.6 104 L 100 31 L 102.4 104 Z" fill="#182420" />
         </g>
-        <circle cx={100} cy={104} r={7} fill="#111827" />
+        <circle cx={100} cy={104} r={8.5} fill="#ffffff" stroke="#182420" strokeWidth={3} />
+        <circle cx={100} cy={104} r={2.5} fill="#182420" />
         <text x={12} y={116} className="gauge-label">FALSKT</text>
         <text x={188} y={116} className="gauge-label" textAnchor="end">SANT</text>
       </svg>
       <div className="gauge-verdict" style={{ backgroundColor: color }}>
-        {event ? `${VERDICT_SYMBOL[event.omdome]} ${event.omdome}` : "väntar på påstående ..."}
+        {event ? `${VERDICT_SYMBOL[event.omdome]} ${event.omdome}` : "Inget omdöme ännu"}
       </div>
+      <p className="gauge-caption">
+        {event
+          ? "Mätaren visar omdömet för det senaste påståendet i debatten."
+          : "Tryck play - mätaren följer debatten."}
+      </p>
     </div>
   );
 }

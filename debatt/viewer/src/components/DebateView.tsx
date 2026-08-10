@@ -1,14 +1,17 @@
 // The full per-debate experience: video (hosted, external link or manual
-// clock), event strip, party curves, gauge, claim card, stats and footer.
-// Shared by the public debate page and the local preview tool.
+// clock), event strip, gauge + claim ("Just nu"), collapsed party curves,
+// summary, collapsed stats and footer. Shared by the public debate page and
+// the editors' preview tools.
 
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import type { Timeline } from "../types";
 import { ClaimCard } from "./ClaimCard";
 import { EventStrip } from "./EventStrip";
 import { PartyCurves } from "./PartyCurves";
 import { StatsPanel } from "./StatsPanel";
 import { TruthGauge } from "./TruthGauge";
+import { VerdictLegend } from "./VerdictLegend";
 import { usePlayback } from "../usePlayback";
 import { formatTime } from "../verdict";
 
@@ -52,14 +55,16 @@ export function DebateView({
   }, [timeline.redaktion]);
 
   const externUrl = timeline.debate.video.externUrl;
+  const hasCurves = Object.values(timeline.series.perParti).some((s) => s.length > 0);
 
   return (
     <>
       <div className="debate-title">
         <h2>
-          {timeline.debate.titel} - {timeline.debate.datum}
+          {timeline.debate.titel}
           {isDemo && <span className="demo-chip">FIKTIV DEMODATA</span>}
         </h2>
+        <p className="debate-date">{timeline.debate.datum}</p>
       </div>
 
       <main className="layout">
@@ -71,19 +76,19 @@ export function DebateView({
               <p>
                 {externUrl ? (
                   <>
-                    Se debatten hos källan (
+                    Se debatten hos{" "}
                     <a href={externUrl} target="_blank" rel="noopener noreferrer">
-                      öppna källan
-                    </a>
-                    ) eller följ tidslinjen här.
+                      källan
+                    </a>{" "}
+                    och följ granskningen här samtidigt.
                   </>
                 ) : (
-                  <>Ingen video är tillgänglig för den här debatten - följ tidslinjen här.</>
+                  <>Videon kan inte visas här. Tryck play för att följa granskningen i debattens takt.</>
                 )}
               </p>
               <div className="demo-controls">
                 <button className="play-button" onClick={playback.toggle}>
-                  {playback.playing ? "Pausa" : "Spela upp"} tidslinjen
+                  {playback.playing ? "Pausa" : "Spela upp"}
                 </button>
                 <span className="demo-time">
                   {formatTime(time)} / {formatTime(duration)}
@@ -91,30 +96,48 @@ export function DebateView({
               </div>
             </div>
           )}
-          <EventStrip
-            events={timeline.events}
-            duration={duration}
-            time={time}
-            activeId={activeEvent?.id ?? null}
-            onSeek={playback.seek}
-          />
-          <PartyCurves
-            perParti={timeline.series.perParti}
-            duration={duration}
-            time={time}
-            onSeek={playback.seek}
-          />
         </section>
 
+        <EventStrip
+          events={timeline.events}
+          duration={duration}
+          time={time}
+          activeId={activeEvent?.id ?? null}
+          onSeek={playback.seek}
+        />
+
         <aside className="side-pane">
+          <p className="now-label">Just nu i debatten</p>
           <TruthGauge event={activeEvent} />
           <ClaimCard
             event={activeEvent}
             live={Boolean(activeEvent && time >= activeEvent.start && time <= activeEvent.end + 5)}
             granskare={activeEvent ? granskareNamn(activeEvent.granskadAv) : []}
           />
+          <VerdictLegend />
         </aside>
+
+        {hasCurves && (
+          <details className="disclosure curves-disclosure">
+            <summary>Så har partierna klarat sig under debatten</summary>
+            <PartyCurves
+              perParti={timeline.series.perParti}
+              duration={duration}
+              time={time}
+              onSeek={playback.seek}
+            />
+          </details>
+        )}
       </main>
+
+      {timeline.sammanfattning && (
+        <section className="summary-section">
+          <h3>Sammanfattning av debatten</h3>
+          {timeline.sammanfattning.split(/\n{2,}/).map((para, i) => (
+            <p key={i}>{para}</p>
+          ))}
+        </section>
+      )}
 
       <StatsPanel timeline={timeline} />
 
@@ -144,6 +167,10 @@ export function DebateView({
           </details>
         )}
         <p className="generated">Genererad {timeline.generatedAt}</p>
+        <p className="editor-links">
+          För redaktionen: <Link to="/granska">Förhandsgranska</Link> ·{" "}
+          <Link to="/admin">Publicera</Link>
+        </p>
       </footer>
     </>
   );

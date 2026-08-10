@@ -13,7 +13,7 @@ interface Props {
 
 const W = 640;
 const H = 180;
-const PAD = { left: 34, right: 10, top: 10, bottom: 22 };
+const PAD = { left: 44, right: 10, top: 10, bottom: 22 };
 
 export function PartyCurves({ perParti, duration, time, onSeek }: Props) {
   const parties = Object.keys(perParti).filter((p) => perParti[p].length > 0);
@@ -43,15 +43,23 @@ export function PartyCurves({ perParti, duration, time, onSeek }: Props) {
   return (
     <div className="curves">
       <div className="curves-head">
-        <h3>Sanningskurvor per parti</h3>
-        <span className="curves-hint">rullande medel, senaste 5 omdömen</span>
+        <span
+          className="curves-hint"
+          title="Rullande medelvärde av de senaste fem avgjorda omdömena, skala 0-100."
+        >
+          Linjen visar snittet av partiets fem senaste omdömen. Högre upp = mer sant.
+        </span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="curves-svg" onClick={handleClick} role="img"
         aria-label="Rullande sanningskurvor per parti">
         {[0, 50, 100].map((v) => (
           <g key={v}>
             <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} className="curves-grid" />
-            <text x={4} y={y(v) + 4} className="curves-axis">{v}</text>
+            {v !== 50 && (
+              <text x={4} y={y(v) + 4} className="curves-axis">
+                {v === 100 ? "Sant" : "Falskt"}
+              </text>
+            )}
           </g>
         ))}
         {parties.map((p) => (

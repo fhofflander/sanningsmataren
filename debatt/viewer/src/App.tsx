@@ -1,13 +1,16 @@
 // App shell: brand header + routes. The per-debate experience lives in
 // components/DebateView.tsx; data loading in lib/data.ts.
 
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AdminPage } from "./routes/admin/AdminPage";
 import { DebatePage } from "./routes/DebatePage";
 import { GranskaPage } from "./routes/GranskaPage";
 import { IndexPage } from "./routes/IndexPage";
 
 export default function App() {
+  const { pathname } = useLocation();
+  const editorMode = pathname.startsWith("/granska") || pathname.startsWith("/admin");
+
   return (
     <div className="app">
       <header className="header">
@@ -16,11 +19,10 @@ export default function App() {
             <Link to="/" className="brand-link">
               Sanningsmätaren <span className="header-module">Debattanalys</span>
             </Link>
+            {editorMode && <span className="editor-chip">Redaktionsläge</span>}
           </h1>
+          <p className="header-tagline">Faktakoll av politiska debatter</p>
         </div>
-        <nav className="header-nav">
-          <Link to="/granska">Förhandsgranska</Link>
-        </nav>
       </header>
 
       <Routes>
