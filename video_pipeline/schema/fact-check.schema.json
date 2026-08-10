@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sanningsmataren.local/schema/fact-check.schema.json",
+  "title": "Sanningsmätaren faktagranskning",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "video", "fact_checks"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "video": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "sha256", "duration_seconds"],
+      "properties": {
+        "filename": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+        "duration_seconds": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "fact_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "start", "end", "claim", "rating", "comment"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "start": {"type": "number", "minimum": 0},
+          "end": {"type": "number", "exclusiveMinimum": 0},
+          "claim": {"type": "string", "minLength": 1},
+          "rating": {
+            "enum": ["true", "partly_true", "misleading", "mostly_false", "false"]
+          },
+          "comment": {"type": "string", "minLength": 1},
+          "transcript_segment_ids": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["title", "url"],
+              "properties": {
+                "title": {"type": "string", "minLength": 1},
+                "url": {"type": "string", "minLength": 1}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

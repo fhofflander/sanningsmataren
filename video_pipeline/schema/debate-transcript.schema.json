@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sanningsmataren.se/schema/debate-transcript-1.0.json",
+  "title": "Sanningsmätaren debatt-transkript",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "created_at",
+    "source",
+    "language",
+    "transcription_backend",
+    "speakers",
+    "segments",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "required": ["input", "kind", "filename", "duration_seconds", "sha256"],
+      "properties": {
+        "input": { "type": "string" },
+        "kind": { "enum": ["file", "url"] },
+        "filename": { "type": "string" },
+        "duration_seconds": { "type": "number", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "webpage_url": { "type": ["string", "null"] },
+        "title": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "language": { "type": "string" },
+    "transcription_backend": { "type": "string" },
+    "speakers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "party",
+          "confidence",
+          "identification_method",
+          "diarization_labels",
+          "reference_id",
+          "evidence_count",
+          "alternatives"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": ["string", "null"] },
+          "party": { "type": ["string", "null"] },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "identification_method": { "type": "string" },
+          "diarization_labels": { "type": "array", "items": { "type": "string" } },
+          "reference_id": { "type": ["string", "null"] },
+          "evidence_count": { "type": "integer", "minimum": 0 },
+          "alternatives": { "type": "array", "items": { "type": "object" } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "start",
+          "end",
+          "start_timecode",
+          "end_timecode",
+          "speaker_id",
+          "speaker_name",
+          "text"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "start": { "type": "number", "minimum": 0 },
+          "end": { "type": "number", "minimum": 0 },
+          "start_timecode": { "type": "string", "pattern": "^[0-9]+:[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}$" },
+          "end_timecode": { "type": "string", "pattern": "^[0-9]+:[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}$" },
+          "speaker_id": { "type": "string" },
+          "speaker_name": { "type": ["string", "null"] },
+          "text": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

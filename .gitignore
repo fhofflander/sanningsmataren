@@ -28,3 +28,12 @@ __pycache__/
 .vscode/*
 !.vscode/extensions.json
 *.local
+
+# Python / debate video pipeline
+*.py[cod]
+.venv/
+.ruff_cache/
+video_pipeline/*.json
+!video_pipeline/extra-roster.example.json
+video_pipeline/*.mp4
+video_pipeline/.debate-cache/

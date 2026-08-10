@@ -104,6 +104,16 @@ host permissions narrow to that one backend domain.
 
 ## Clients
 
+### Video pipeline (MVP)
+
+Repositoryt innehåller nu även ett separat Python-CLI som tar en videofil eller
+video-URL och skapar ett tidsstämplat JSON-transkript med diariserade och, när
+säkerheten räcker, bildidentifierade talare. Identifieringen använder lokala
+ansiktsvektorer, läppaktivitet och OCR mot Riksdagens öppna data för att hålla
+kostnad och datadelning nere. Ett Windows-GUI med filväljare och
+dubbelklicksinstallation finns i samma mapp. Se
+[`video_pipeline/README.md`](./video_pipeline/README.md).
+
 ### Web SPA
 
 A React single-page app. In the target model it signs the user in and calls the
@@ -205,8 +215,9 @@ affects the extension or the planned backend. See
 - Live audio capture and transcription are explicitly **out of scope for the
   clients**. The app works only on text you paste, select, or load from a page.
   The Chrome extension reads page and selection text; it does not record or
-  transcribe audio. (The separate Debattanalys module processes recorded
-  broadcasts offline; it is not part of the extension or SPA.)
+  transcribe audio. The separate Debattanalys module and video CLI process
+  completed recordings or video URLs offline; they are not part of the
+  extension or SPA, and live streams remain out of scope.
 
 ## License
 

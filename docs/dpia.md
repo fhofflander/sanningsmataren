@@ -26,6 +26,10 @@ and date here.
   company-funded backend with Google sign-in.
 - **Purposes:** provide fact-checking; enforce fair-use quota; improve quality
   through logging.
+- **Video MVP:** a separate local CLI can extract audio from recorded political
+  debates, transcribe and diarise it, and compare sampled active faces with a
+  local reference index of public officials. This flow is not yet part of the
+  public SPA/backend and needs a separate legal sign-off before deployment.
 
 Data flow:
 ```
@@ -50,6 +54,7 @@ Extension/SPA --(Google id_token)--> Backend (EU region) --(company key)--> AI /
 | Users | Google id, email | No |
 | Users | Submitted text, verdicts | Yes (political opinions, Art. 9) |
 | Users | Usage counts, technical metadata | No |
+| Politicians/moderators in video | Voice, face samples, inferred identity and local face vectors | Potential biometric processing; legal classification and lawful basis must be assessed |
 
 ## 5. Risks to data subjects
 
@@ -59,6 +64,10 @@ Extension/SPA --(Google id_token)--> Backend (EU region) --(company key)--> AI /
 - Third-country transfer to US-based providers.
 - Over-retention beyond the stated purpose.
 - Consent not being freely given or easy to withdraw.
+- False speaker identification causing reputational harm or incorrect
+  attribution of a political statement.
+- Disproportionate retention or reuse of face vectors beyond the stated
+  transcription purpose.
 
 ## 6. Risk assessment
 
@@ -78,6 +87,15 @@ Extension/SPA --(Google id_token)--> Backend (EU region) --(company key)--> AI /
 - Data processing agreements and transfer safeguards (DPF/SCC) with all
   processors (Vercel/host, Google, Anthropic, Brave).
 - Keys server-side only; no remote code in the extension.
+- Keep video frames and face matching local; upload only the extracted audio when
+  the OpenAI transcription mode is selected.
+- Delete temporary video/audio/frame data after each run. Keep only the public
+  reference image cache and derived reference index for the documented purpose.
+- Require multiple consistent observations, expose confidence and alternatives,
+  return an unknown speaker instead of guessing, and require human review before
+  publication.
+- Restrict the default reference set to relevant public officials and document
+  each extra reference image's source and reuse rights.
 
 ## 8. Residual risk and sign-off
 

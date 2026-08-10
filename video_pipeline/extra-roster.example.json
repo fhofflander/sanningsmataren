@@ -1,0 +1,12 @@
+{
+  "people": [
+    {
+      "id": "moderator-exempel",
+      "name": "Förnamn Efternamn",
+      "party": null,
+      "image_url": "https://example.org/tillaten-portrattbild.jpg",
+      "source": "Organisationens officiella pressbild",
+      "aliases": ["F. Efternamn"]
+    }
+  ]
+}
