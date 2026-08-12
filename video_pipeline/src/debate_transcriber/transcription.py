@@ -21,6 +21,7 @@ from .progress import TranscriptionProgress
 
 
 TranscriptionProgressCallback = Callable[[TranscriptionProgress], None]
+DEFAULT_DIARIZATION_THRESHOLD = 0.65
 
 _SENTENCE_END = re.compile(r'[.!?…]+(?:["”’»\)\]]+)?$')
 _NON_TERMINAL_ABBREVIATIONS = {
@@ -46,6 +47,15 @@ _NON_TERMINAL_ABBREVIATIONS = {
 class Transcription:
     segments: list[TranscriptSegment]
     language: str
+    warnings: list[str]
+
+
+SpeakerTurn = tuple[float, float, str]
+
+
+@dataclass(slots=True)
+class Diarization:
+    turns: list[SpeakerTurn]
     warnings: list[str]
 
 
@@ -168,6 +178,150 @@ class LocalTranscriber:
             self, audio_path, workdir, progress=progress
         )
 
+    def diarize(
+        self,
+        audio_path: Path,
+        workdir: Path,
+        progress: TranscriptionProgressCallback | None = None,
+    ) -> Diarization:
+        """Dela upp ljudet i röster utan att ännu köra Whisper."""
+        return _run_local_diarization_isolated(
+            self, audio_path, workdir, progress=progress
+        )
+
+    def transcribe_with_turns(
+        self,
+        audio_path: Path,
+        workdir: Path,
+        turns: list[SpeakerTurn],
+        progress: TranscriptionProgressCallback | None = None,
+    ) -> Transcription:
+        """Transkribera sist och använd redan fastställda talartider."""
+        return _run_local_whisper_isolated(
+            self, audio_path, workdir, turns, progress=progress
+        )
+
+    def _diarize_only_in_process(
+        self,
+        audio_path: Path,
+        workdir: Path,
+        progress: TranscriptionProgressCallback | None = None,
+    ) -> Diarization:
+        if progress is not None:
+            progress(
+                TranscriptionProgress(
+                    0.0,
+                    0.0,
+                    phase="speaker_diarization",
+                )
+            )
+        try:
+            import numpy as np
+            import sherpa_onnx
+        except ImportError as error:
+            raise RuntimeError(
+                'Installera lokala modeller med: pip install -e ".[local]"'
+            ) from error
+
+        model_paths = ensure_sherpa_models(self.cache_dir)
+        pcm_path = _convert_to_pcm_wave(audio_path, workdir)
+        samples = _read_pcm16_mono(pcm_path, np)
+        exact_speakers = (
+            self.min_speakers
+            if self.min_speakers is not None and self.min_speakers == self.max_speakers
+            else -1
+        )
+        threads = max(1, min(4, os.cpu_count() or 1))
+        config = sherpa_onnx.OfflineSpeakerDiarizationConfig(
+            segmentation=sherpa_onnx.OfflineSpeakerSegmentationModelConfig(
+                pyannote=sherpa_onnx.OfflineSpeakerSegmentationPyannoteModelConfig(
+                    model=str(model_paths.segmentation)
+                ),
+                num_threads=threads,
+            ),
+            embedding=sherpa_onnx.SpeakerEmbeddingExtractorConfig(
+                model=str(model_paths.embedding),
+                num_threads=threads,
+            ),
+            clustering=sherpa_onnx.FastClusteringConfig(
+                num_clusters=exact_speakers,
+                threshold=DEFAULT_DIARIZATION_THRESHOLD,
+            ),
+            min_duration_on=0.3,
+            min_duration_off=0.5,
+        )
+        if not config.validate():
+            raise RuntimeError("De lokala diariseringsmodellerna kunde inte läsas.")
+        diarizer = sherpa_onnx.OfflineSpeakerDiarization(config)
+        result = diarizer.process(samples).sort_by_start_time()
+        turns = _sherpa_turns(result)
+        warnings: list[str] = []
+        if (self.min_speakers is not None or self.max_speakers is not None) and (
+            exact_speakers == -1
+        ):
+            warnings.append(
+                "Sherpa-läget kan använda ett exakt talarantal men inte ett intervall. "
+                "Ange samma min- och maxvärde för att låsa antalet talare."
+            )
+        if not turns:
+            warnings.append("Den lokala diarisationen hittade inga tydliga talarbyten.")
+        return Diarization(turns, warnings)
+
+    def _transcribe_words_in_process(
+        self,
+        audio_path: Path,
+        workdir: Path,
+        turns: list[SpeakerTurn],
+        progress: TranscriptionProgressCallback | None = None,
+    ) -> Transcription:
+        configure_cuda_dll_directories()
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError as error:
+            raise RuntimeError(
+                'Installera lokala modeller med: pip install -e ".[local]"'
+            ) from error
+
+        warnings: list[str] = []
+        try:
+            words, info = _transcribe_with_whisper(
+                WhisperModel,
+                audio_path,
+                language=self.language,
+                model_name=self.whisper_model,
+                device=self.device,
+                compute_type=self.compute_type,
+                progress=progress,
+                workdir=workdir,
+                chunk_seconds=600,
+            )
+        except (OSError, RuntimeError) as error:
+            if self.device != "cuda" or not _looks_like_cuda_runtime_error(error):
+                raise
+            gc.collect()
+            words, info = _transcribe_with_whisper(
+                WhisperModel,
+                audio_path,
+                language=self.language,
+                model_name=self.whisper_model,
+                device="cpu",
+                compute_type="int8",
+                progress=progress,
+                workdir=workdir,
+                chunk_seconds=600,
+            )
+            warnings.append(
+                "CUDA kunde inte starta eftersom NVIDIA-biblioteken saknas eller inte "
+                "kunde läsas. Transkriberingen kördes automatiskt på CPU med int8."
+            )
+
+        assigned = [
+            _assign_word(start, end, text, turns) for start, end, text in words
+        ]
+        segments = _group_words(assigned)
+        language = getattr(info, "language", None) or self.language
+        return Transcription(segments, str(language), warnings)
+
     def _transcribe_in_process(
         self,
         audio_path: Path,
@@ -220,6 +374,14 @@ class LocalTranscriber:
         # hela pythonw.exe utan ett fångstbart Python-undantag på Windows.
         del WhisperModel
         gc.collect()
+        if progress is not None:
+            progress(
+                TranscriptionProgress(
+                    0.0,
+                    0.0,
+                    phase="speaker_diarization",
+                )
+            )
         try:
             import numpy as np
             import sherpa_onnx
@@ -250,7 +412,7 @@ class LocalTranscriber:
             ),
             clustering=sherpa_onnx.FastClusteringConfig(
                 num_clusters=exact_speakers,
-                threshold=0.5,
+                threshold=DEFAULT_DIARIZATION_THRESHOLD,
             ),
             min_duration_on=0.3,
             min_duration_off=0.5,
@@ -271,7 +433,9 @@ class LocalTranscriber:
                 "Ange samma min- och maxvärde för att låsa antalet talare."
             )
         if not turns:
-            warnings.append("Den lokala diarisationen hittade inga tydliga talarbyten.")
+            warnings.append(
+                "Den lokala diarisationen hittade inga tydliga talarbyten."
+            )
         return Transcription(segments, str(language), warnings)
 
 
@@ -287,6 +451,42 @@ def _local_transcription_worker(
         result = transcriber._transcribe_in_process(
             audio_path,
             workdir,
+            progress=lambda update: messages.put(("progress", update)),
+        )
+        messages.put(("result", result))
+    except BaseException:
+        messages.put(("error", traceback.format_exc()))
+
+
+def _local_diarization_worker(
+    transcriber: LocalTranscriber,
+    audio_path: Path,
+    workdir: Path,
+    messages: Any,
+) -> None:
+    try:
+        result = transcriber._diarize_only_in_process(
+            audio_path,
+            workdir,
+            progress=lambda update: messages.put(("progress", update)),
+        )
+        messages.put(("result", result))
+    except BaseException:
+        messages.put(("error", traceback.format_exc()))
+
+
+def _local_whisper_worker(
+    transcriber: LocalTranscriber,
+    audio_path: Path,
+    workdir: Path,
+    turns: list[SpeakerTurn],
+    messages: Any,
+) -> None:
+    try:
+        result = transcriber._transcribe_words_in_process(
+            audio_path,
+            workdir,
+            turns,
             progress=lambda update: messages.put(("progress", update)),
         )
         messages.put(("result", result))
@@ -318,6 +518,105 @@ def _run_local_transcription_isolated(
             if progress is not None:
                 progress(payload)
         elif kind == "result" and isinstance(payload, Transcription):
+            result = payload
+        elif kind == "error":
+            child_error = str(payload)
+
+    try:
+        while process.is_alive():
+            try:
+                kind, payload = messages.get(timeout=0.2)
+                receive(str(kind), payload)
+            except queue.Empty:
+                continue
+        process.join()
+        while True:
+            try:
+                kind, payload = messages.get_nowait()
+                receive(str(kind), payload)
+            except queue.Empty:
+                break
+    except BaseException:
+        if process.is_alive():
+            process.terminate()
+        process.join(timeout=5)
+        raise
+    finally:
+        messages.close()
+        messages.join_thread()
+
+    if result is not None:
+        return result
+    if child_error:
+        raise RuntimeError(
+            "Den lokala modellprocessen misslyckades:\n" + child_error.rstrip()
+        )
+    raise RuntimeError(
+        "Den lokala modellprocessen avslutades oväntat "
+        f"(Windows-returkod {process.exitcode}). GUI:t skyddades och är fortfarande "
+        "öppet. Prova igen eller välj CPU under Avancerat."
+    )
+
+
+def _run_local_diarization_isolated(
+    transcriber: LocalTranscriber,
+    audio_path: Path,
+    workdir: Path,
+    *,
+    progress: TranscriptionProgressCallback | None,
+) -> Diarization:
+    result = _run_local_stage_isolated(
+        _local_diarization_worker,
+        (transcriber, audio_path, workdir),
+        Diarization,
+        "debate-local-diarization",
+        progress,
+    )
+    return result
+
+
+def _run_local_whisper_isolated(
+    transcriber: LocalTranscriber,
+    audio_path: Path,
+    workdir: Path,
+    turns: list[SpeakerTurn],
+    *,
+    progress: TranscriptionProgressCallback | None,
+) -> Transcription:
+    result = _run_local_stage_isolated(
+        _local_whisper_worker,
+        (transcriber, audio_path, workdir, turns),
+        Transcription,
+        "debate-local-whisper",
+        progress,
+    )
+    return result
+
+
+def _run_local_stage_isolated(
+    worker: Callable[..., None],
+    worker_args: tuple[Any, ...],
+    result_type: type[Any],
+    process_name: str,
+    progress: TranscriptionProgressCallback | None,
+) -> Any:
+    context = multiprocessing.get_context("spawn")
+    messages = context.Queue()
+    process = context.Process(
+        target=worker,
+        args=(*worker_args, messages),
+        name=process_name,
+    )
+    process.start()
+    result: Any = None
+    child_error: str | None = None
+
+    def receive(kind: str, payload: object) -> None:
+        nonlocal result, child_error
+        if kind == "progress" and isinstance(payload, TranscriptionProgress):
+            if progress is not None:
+                progress(payload)
+        elif kind == "result" and isinstance(payload, result_type):
             result = payload
         elif kind == "error":
             child_error = str(payload)

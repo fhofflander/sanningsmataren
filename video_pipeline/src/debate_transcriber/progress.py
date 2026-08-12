@@ -9,6 +9,7 @@ class TranscriptionProgress:
 
     processed_seconds: float
     total_seconds: float
+    phase: str = "speech_to_text"
 
     @property
     def ratio(self) -> float:

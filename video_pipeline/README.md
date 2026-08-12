@@ -24,6 +24,25 @@ tid. I lokalläget behövs inga API-nycklar.
   Whisper- och sherpa-onnx-paketen.
 - `run-gui.bat` startar programmet efter installationen.
 
+### Kontrollera personer före transkriberingen
+
+I lokalläget är ordningen nu uttryckligen bild först och Whisper sist:
+
+1. Hela filmen skannas och ett avduplicerat persongalleri byggs.
+2. Oidentifierade personer visas med en bild från filmen. I den redigerbara
+   vallistan kan användaren välja en person som redan hittats, skriva ett nytt
+   namn eller markera **Ej relevant**. Mushjulet rullar hela listan. Därefter
+   visas återstående personer sorterade efter namn i en avduplicerad
+   sammanställning; redan irrelevanta personer visas inte igen.
+3. Ljudet delas upp i röstkluster utan att någon text ännu skapas.
+4. Röstklustren kopplas till de kontrollerade personerna. Endast eventuella
+   återstående okända röster behöver en extra manuell kontroll.
+5. Först när namn och relevans är fastställda startar Whisper och skapar texten.
+
+Personer med samma normaliserade namn slås ihop. Alla segment från personer som
+markerats som ej relevanta tas bort innan JSON-filen skapas; tiderna för övriga
+segment behåller sina ursprungliga positioner i filmen.
+
 ### Skapa en faktagranskad film
 
 Klicka på **Skapa faktagranskad film …** i huvudfönstret och välj:
@@ -50,18 +69,26 @@ debate-transcriber analyze C:\video\debatt.mp4 --output debatt.json
 Omvänd bildsökning för varje bildruta skulle både kosta mer, läcka fler bilder
 till tredje part och ge svårreproducerbara resultat. Programmet gör i stället:
 
-1. Ljudet diariseras till anonyma röstkluster, exempelvis `A`, `B` och `C`.
-2. Ett litet antal bildfönster väljs ut per röstkluster, jämnt fördelade genom
-   videon. Därmed analyseras inte alla bildrutor.
-3. När flera ansikten syns mäts rörelse i munområdet. Ett centralt eller stort
-   ansikte räknas inte automatiskt som talare.
-4. Det aktiva ansiktets lokala OpenCV SFace-vektor jämförs mot ett lokalt index.
-   Referensbilder för riksdagsledamöter hämtas kostnadsfritt från
+1. Hela filmen samplas först varannan sekund. Alla tillräckligt tydliga ansikten
+   grupperas lokalt till ett persongalleri; personer som syns samtidigt kan
+   aldrig slås ihop.
+2. Varje unik galleri-person jämförs mot det lokala SFace-indexet. Namn kräver
+   minst tre samstämmiga bilder över tid, tydlig marginal till näst bästa träff
+   och både stark median- och centroidlikhet.
+3. Användaren kontrollerar persongalleriet före texttranskriberingen och kan
+   namnge eller utesluta personer.
+4. Sherpa delar därefter upp ljudet i röstintervall utan att köra Whisper. Den
+   lokala klustertröskeln är kalibrerad för debattljud för att undvika hundratals
+   falska röstkluster.
+5. När flera ansikten syns under ett talavsnitt mäts rörelse i munområdet. Ett
+   centralt eller stort ansikte räknas inte automatiskt som talare.
+6. Det aktiva ansiktet kopplas endast till en redan etablerad person i galleriet.
+   Namn och porträtt kommer därför alltid från samma personpost. Referensbilder
+   för riksdagsledamöter hämtas kostnadsfritt från
    [Riksdagens öppna data](https://www.riksdagen.se/sv/dokument-och-lagar/riksdagens-oppna-data/).
-5. OCR av tv-kanalens namnskylt i bildens nedre del används som en andra,
-   oberoende signal.
-6. Flera observationer måste peka på samma person. Vid låg säkerhet skrivs
-   `name: null` och de bästa alternativen i JSON – systemet chansar inte.
+7. Flera röstobservationer måste peka på samma galleri-person. Vid låg säkerhet
+   lämnas personen namnlös för den manuella kontrollen – systemet chansar inte.
+8. Whisper körs sist och orden märks med de redan fastställda talarna.
 
 Detta hanterar också en vanlig tv-fälla: kameran kan visa en åhörare medan någon
 annan talar. Spridda felbilder röstar då normalt inte ned de konsekventa bilderna
@@ -128,8 +155,12 @@ Lokalläget är lokalt i betydelsen att själva analysen inte skickar video, lju
 bilder eller text till en molntjänst. Internet behövs fortfarande första gången
 för modell- och talarregisterhämtning samt när källan är en URL.
 
-Första identifieringen hämtar ledamotsbilder samt OpenCV-modellerna SFace och
-YuNet och bygger ett lokalt index. Det är ett engångsarbete. Modellversionerna är
+Första identifieringen hämtar ledamotsbilder, ett särskilt register över samtliga
+aktuella partiledare/språkrör och flera fria Wikimedia Commons-bilder per ledare.
+Varje extra bild jämförs först med Riksdagens betrodda porträtt; bilder som inte
+föreställer samma person tas inte med i indexet. Därefter bygger programmet ett
+lokalt index med OpenCV-modellerna SFace och YuNet. Det är ett engångsarbete.
+Modellversionerna är
 låsta och deras SHA-256-kontrollsummor verifieras vid hämtning. YuNet-modellen är
 MIT-licensierad och [SFace-modellen är Apache 2.0-licensierad](https://github.com/opencv/opencv_zoo/blob/main/models/face_recognition_sface/LICENSE).
 För att göra indexeringen uttryckligen:
@@ -143,19 +174,21 @@ Talarregister och ansiktsindex lagras normalt under
 `%LOCALAPPDATA%\Sanningsmataren\debate-transcriber`. Sätt
 `DEBATE_TRANSCRIBER_CACHE` för en annan plats.
 
-## Moderatorer, partiledare utanför riksdagen och äldre politiker
+## Moderatorer och äldre politiker
 
-Aktuella riksdagsledamöter är standard för att hålla registret litet och minska
-falska träffar. Tidigare ledamöter kan tas med med `--include-former` eller
-`roster-sync --all`. Lägg hellre till debattens faktiska moderatorer och gäster
-via ett eget, litet register:
+Aktuella riksdagsledamöter och samtliga aktuella partiledare/språkrör är standard.
+Tidigare ledamöter kan tas med med `--include-former` eller `roster-sync --all`.
+Lägg hellre till debattens faktiska moderatorer och gäster via ett eget, litet
+register:
 
 ```powershell
 debate-transcriber analyze debatt.mp4 --extra-roster extra-roster.example.json
 ```
 
-Varje post behöver ett stabilt id, namn och en direktlänk till en tydlig
-porträttbild. Ange bildkälla och kontrollera att bilden får återanvändas.
+Varje post behöver ett stabilt id, namn och minst en direktlänk till en tydlig
+porträttbild. Fältet `image_urls` kan innehålla flera oberoende referensbilder;
+den första bilden i `image_url` är ankaret som övriga automatiskt jämförs med.
+Ange bildkälla och kontrollera att bilderna får återanvändas.
 
 ## Exempel på resultat
 

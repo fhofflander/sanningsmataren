@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from debate_transcriber.transcription import (
+    DEFAULT_DIARIZATION_THRESHOLD,
     _assign_word,
     _group_words,
     _looks_like_cuda_runtime_error,
@@ -23,6 +24,9 @@ class _NativeCrashSimulation:
 
 
 class TranscriptionTests(unittest.TestCase):
+    def test_default_diarization_threshold_avoids_extreme_overclustering(self) -> None:
+        self.assertEqual(DEFAULT_DIARIZATION_THRESHOLD, 0.65)
+
     @unittest.skipUnless(sys.platform == "win32", "Windows process isolation")
     def test_native_model_crash_does_not_kill_parent_process(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "Windows-returkod 7"):

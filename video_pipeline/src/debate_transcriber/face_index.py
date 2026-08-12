@@ -9,7 +9,11 @@ from typing import Any
 
 from .roster import load_roster
 
-INDEX_MODEL_ID = "opencv/sface-2021dec+yunet-2023mar"
+INDEX_MODEL_ID = "opencv/sface-2021dec+yunet-2023mar+multiref-v2"
+REFERENCE_MIN_COSINE = 0.36
+REFERENCE_CLUSTER_COSINE = 0.48
+REFERENCE_DUPLICATE_COSINE = 0.995
+MAX_REFERENCES_PER_PERSON = 6
 MODEL_FILES = {
     "face_detection_yunet_2023mar.onnx": (
         "https://github.com/opencv/opencv_zoo/raw/refs/tags/4.10.0/"
@@ -31,6 +35,8 @@ class FaceIndexEntry:
     party: str | None
     source: str
     aliases: list[str]
+    is_party_leader: bool = False
+    reference_count: int = 1
 
 
 @dataclass(slots=True)
@@ -120,8 +126,23 @@ class FaceIndex:
         if norm == 0 or not len(self.entries):
             return []
         scores = self.embeddings @ (vector / norm)
-        top = np.argsort(scores)[::-1][:3]
-        return [(self.entries[int(index)], float(scores[index])) for index in top]
+        by_person: dict[str, list[tuple[float, FaceIndexEntry]]] = {}
+        for index, raw_score in enumerate(scores):
+            entry = self.entries[index]
+            by_person.setdefault(entry.id, []).append((float(raw_score), entry))
+        ranked: list[tuple[FaceIndexEntry, float]] = []
+        for references in by_person.values():
+            references.sort(key=lambda item: item[0], reverse=True)
+            best_score, entry = references[0]
+            if len(references) > 1:
+                # Två oberoende mallar får bidra, men en dålig vinkel ska inte
+                # kunna sänka en tydlig träff alltför mycket.
+                score = 0.88 * best_score + 0.12 * references[1][0]
+            else:
+                score = best_score
+            ranked.append((entry, score))
+        ranked.sort(key=lambda item: item[1], reverse=True)
+        return ranked[:3]
 
 
 def create_face_analyzer(model_dir: Path) -> OpenCVFaceAnalyzer:
@@ -144,31 +165,65 @@ def build_face_index(roster_dir: Path) -> tuple[int, list[str]]:
     embeddings: list[Any] = []
     failures: list[str] = []
 
+    people_indexed = 0
     for person in people:
-        image = cv2.imread(str(roster_dir / person.image_path))
-        if image is None:
-            failures.append(person.id)
-            continue
-        faces = analyzer.get(image)
-        if not faces:
-            failures.append(person.id)
-            continue
-        face = max(faces, key=lambda item: _bbox_area(item.bbox))
-        embedding = np.asarray(face.embedding, dtype=np.float32)
-        norm = float(np.linalg.norm(embedding))
-        if norm == 0:
-            failures.append(person.id)
-            continue
-        embeddings.append(embedding / norm)
-        entries.append(
-            FaceIndexEntry(
-                id=person.id,
-                name=person.name,
-                party=person.party,
-                source=person.source,
-                aliases=person.aliases,
-            )
+        image_paths = person.all_image_paths()
+        anchor = _reference_embedding(
+            cv2, np, analyzer, roster_dir / image_paths[0], anchor=None
         )
+        if anchor is None:
+            failures.append(person.id)
+            continue
+
+        candidate_references: list[tuple[str, Any]] = []
+        for relative_path in image_paths[1:]:
+            embedding = _reference_embedding(
+                cv2, np, analyzer, roster_dir / relative_path, anchor=anchor
+            )
+            if embedding is None:
+                failures.append(f"{person.id}:{Path(relative_path).name}")
+                continue
+            if max(
+                [float(anchor @ embedding)]
+                + [
+                    float(reference @ embedding)
+                    for _, reference in candidate_references
+                ]
+            ) >= REFERENCE_DUPLICATE_COSINE:
+                continue
+            candidate_references.append((relative_path, embedding))
+
+        accepted_indexes = _select_verified_references(
+            anchor, [embedding for _, embedding in candidate_references]
+        )
+        verified = [
+            (path, embedding)
+            for index, (path, embedding) in enumerate(candidate_references)
+            if index in accepted_indexes
+        ]
+        verified.sort(key=lambda item: float(anchor @ item[1]), reverse=True)
+        selected = [anchor, *[embedding for _, embedding in verified]][
+            :MAX_REFERENCES_PER_PERSON
+        ]
+        for index, (relative_path, _) in enumerate(candidate_references):
+            if index not in accepted_indexes:
+                failures.append(f"{person.id}:{Path(relative_path).name}:avvikande")
+
+        reference_count = len(selected)
+        people_indexed += 1
+        for embedding in selected:
+            embeddings.append(embedding)
+            entries.append(
+                FaceIndexEntry(
+                    id=person.id,
+                    name=person.name,
+                    party=person.party,
+                    source=person.source,
+                    aliases=person.aliases,
+                    is_party_leader=person.is_party_leader,
+                    reference_count=reference_count,
+                )
+            )
 
     if not embeddings:
         raise RuntimeError("Inga ansikten kunde indexeras från talarregistret.")
@@ -178,11 +233,87 @@ def build_face_index(roster_dir: Path) -> tuple[int, list[str]]:
         "model": INDEX_MODEL_ID,
         "entries": [asdict(entry) for entry in entries],
         "failures": failures,
+        "people_count": people_indexed,
+        "reference_count": len(entries),
     }
     (roster_dir / "face_index.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     return len(entries), failures
+
+
+def _reference_embedding(
+    cv2: Any,
+    np: Any,
+    analyzer: OpenCVFaceAnalyzer,
+    image_path: Path,
+    *,
+    anchor: Any | None,
+) -> Any | None:
+    image = cv2.imread(str(image_path))
+    if image is None:
+        return None
+    faces = analyzer.get(image)
+    if not faces:
+        return None
+    if anchor is None:
+        face = max(faces, key=lambda item: _bbox_area(item.bbox))
+    else:
+        scored: list[tuple[float, DetectedFace]] = []
+        for candidate in faces:
+            embedding = np.asarray(candidate.embedding, dtype=np.float32)
+            norm = float(np.linalg.norm(embedding))
+            if norm:
+                scored.append((float(anchor @ (embedding / norm)), candidate))
+        if not scored:
+            return None
+        _, face = max(scored, key=lambda item: item[0])
+    embedding = np.asarray(face.embedding, dtype=np.float32)
+    norm = float(np.linalg.norm(embedding))
+    return embedding / norm if norm else None
+
+
+def _select_verified_references(
+    anchor: Any, references: list[Any]
+) -> set[int]:
+    """Godkänn starka ankarmatcher eller ett samstämmigt bildkluster.
+
+    Klusterregeln fångar samma person över större utseendeförändringar, men en
+    ensam svag nätbild kan aldrig godkännas.
+    """
+    if not references:
+        return set()
+    anchor_scores = [float(anchor @ reference) for reference in references]
+    accepted = {
+        index
+        for index, score in enumerate(anchor_scores)
+        if score >= REFERENCE_MIN_COSINE
+    }
+    unseen = set(range(len(references)))
+    while unseen:
+        seed = unseen.pop()
+        component = {seed}
+        pending = [seed]
+        while pending:
+            current = pending.pop()
+            neighbours = {
+                index
+                for index in unseen
+                if float(references[current] @ references[index])
+                >= REFERENCE_CLUSTER_COSINE
+            }
+            unseen.difference_update(neighbours)
+            component.update(neighbours)
+            pending.extend(neighbours)
+        best_anchor = max(anchor_scores[index] for index in component)
+        corroborated = (
+            len(component) >= 3 and best_anchor >= 0.26
+        ) or (
+            len(component) >= 2 and best_anchor >= 0.32
+        )
+        if corroborated or component & accepted:
+            accepted.update(component)
+    return accepted
 
 
 def face_index_is_current(roster_dir: Path) -> bool:

@@ -87,7 +87,8 @@ def main(argv: list[str] | None = None) -> None:
         if args.command == "roster-index":
             count, failures = build_face_index(roster_dir)
             print(
-                f"Ansiktsindex klart: {count} personer, {len(failures)} misslyckades."
+                f"Ansiktsindex klart: {count} referensansikten, "
+                f"{len(failures)} bilder avvisades."
             )
             return
 

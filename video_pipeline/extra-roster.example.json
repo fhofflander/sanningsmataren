@@ -5,6 +5,9 @@
       "name": "Förnamn Efternamn",
       "party": null,
       "image_url": "https://example.org/tillaten-portrattbild.jpg",
+      "image_urls": [
+        "https://example.org/tillaten-portrattbild-2.jpg"
+      ],
       "source": "Organisationens officiella pressbild",
       "aliases": ["F. Efternamn"]
     }

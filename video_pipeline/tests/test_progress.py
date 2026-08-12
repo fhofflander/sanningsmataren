@@ -9,6 +9,13 @@ from debate_transcriber.progress import (
 
 
 class ProgressTests(unittest.TestCase):
+    def test_progress_can_report_speaker_diarization_phase(self) -> None:
+        progress = TranscriptionProgress(
+            0, 0, phase="speaker_diarization"
+        )
+        self.assertEqual(progress.phase, "speaker_diarization")
+        self.assertEqual(progress.ratio, 0)
+
     def test_ratio_is_clamped_to_video_duration(self) -> None:
         self.assertEqual(TranscriptionProgress(125, 100).ratio, 1.0)
         self.assertEqual(TranscriptionProgress(-5, 100).ratio, 0.0)

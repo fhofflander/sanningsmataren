@@ -12,6 +12,7 @@ import threading
 import time
 import tkinter as tk
 import webbrowser
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -37,7 +38,19 @@ from .progress import (
     format_media_time,
     format_remaining_time,
 )
+from .speaker_review import (
+    SpeakerReviewDecision,
+    SpeakerReviewItem,
+)
+from .speaker_review_gui import SpeakerReviewDialog
 from .transcription import LocalTranscriber, OpenAIDiarizedTranscriber
+
+
+@dataclass(slots=True)
+class _SpeakerReviewRequest:
+    items: list[SpeakerReviewItem]
+    completed: threading.Event = field(default_factory=threading.Event)
+    decision: SpeakerReviewDecision | None = None
 
 
 class DebateTranscriberApp:
@@ -56,6 +69,7 @@ class DebateTranscriberApp:
         self.advanced_visible = False
         self.advanced_window: tk.Toplevel | None = None
         self.factcheck_dialog: FactCheckVideoDialog | None = None
+        self.speaker_review_dialog: SpeakerReviewDialog | None = None
         self.transcription_started_at: float | None = None
 
         self._create_variables()
@@ -620,6 +634,7 @@ class DebateTranscriberApp:
                         transcription_progress=lambda update: self.events.put(
                             ("transcription_progress", update)
                         ),
+                        speaker_reviewer=self._request_speaker_review,
                         should_cancel=self.cancel_event.is_set,
                     )
             self.events.put(
@@ -648,6 +663,53 @@ class DebateTranscriberApp:
             "Avbrott begärt. Ett pågående modell- eller API-anrop måste slutföras först."
         )
 
+    def _request_speaker_review(
+        self, items: list[SpeakerReviewItem]
+    ) -> SpeakerReviewDecision:
+        request = _SpeakerReviewRequest(items)
+        self.events.put(("speaker_review", request))
+        while not request.completed.wait(0.1):
+            if self.cancel_event.is_set():
+                raise AnalysisCancelled("Analysen avbröts av användaren.")
+        if request.decision is None:
+            raise AnalysisCancelled("Talargranskningen avbröts av användaren.")
+        return request.decision
+
+    def _open_speaker_review(self, request: _SpeakerReviewRequest) -> None:
+        if self.cancel_event.is_set():
+            request.completed.set()
+            return
+        self.progress.stop()
+        self.progress.configure(mode="indeterminate", value=0)
+        self.status_var.set("Väntar på kontroll av personer …")
+        self.progress_detail_var.set(
+            "Namnge oidentifierade personer och välj vilka som är relevanta."
+        )
+        self._log("Öppnar den manuella kontrollen av personer i filmen.")
+        self.speaker_review_dialog = SpeakerReviewDialog(
+            self.root,
+            request.items,
+            lambda decision: self._finish_speaker_review(request, decision),
+        )
+
+    def _finish_speaker_review(
+        self,
+        request: _SpeakerReviewRequest,
+        decision: SpeakerReviewDecision | None,
+    ) -> None:
+        request.decision = decision
+        request.completed.set()
+        self.speaker_review_dialog = None
+        if decision is None:
+            self.cancel_event.set()
+            return
+        self.status_var.set("Fortsätter analysen …")
+        self.progress_detail_var.set(
+            "Tillämpar valda namn och relevansfilter före nästa steg."
+        )
+        self.progress.configure(mode="indeterminate", value=0)
+        self.progress.start(12)
+
     def _poll_events(self) -> None:
         try:
             while True:
@@ -659,6 +721,10 @@ class DebateTranscriberApp:
                     payload, TranscriptionProgress
                 ):
                     self._show_transcription_progress(payload)
+                elif kind == "speaker_review" and isinstance(
+                    payload, _SpeakerReviewRequest
+                ):
+                    self._open_speaker_review(payload)
                 elif kind == "done":
                     data = dict(payload)  # type: ignore[arg-type]
                     self.last_output = Path(str(data["output"]))
@@ -707,6 +773,16 @@ class DebateTranscriberApp:
             self.progress_panel.grid_remove()
 
     def _show_transcription_progress(self, update: TranscriptionProgress) -> None:
+        if update.phase == "speaker_diarization":
+            self.progress.stop()
+            self.progress.configure(mode="indeterminate", value=0)
+            self.progress.start(12)
+            self.status_var.set("Delar upp ljudet i röster …")
+            self.progress_detail_var.set(
+                "Röstanalysen körs före Whisper så att talarna kan kontrolleras "
+                "innan texten transkriberas."
+            )
+            return
         now = time.monotonic()
         if self.transcription_started_at is None or update.processed_seconds <= 0:
             self.transcription_started_at = now
